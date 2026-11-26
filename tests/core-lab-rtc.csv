@@ -1,0 +1,4 @@
+date,scope,pairs,connected,ack_received,ack_expected,total_ms,rtt_median_ms,rtt_max_ms
+2026-11-26,local_loopback,1,1,16,16,72.6,19.2,21.6
+2026-11-26,local_loopback,3,3,48,48,144.4,34.4,73.7
+2026-11-26,local_loopback,7,7,112,112,288.7,72.1,114.5
