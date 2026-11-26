@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>星光极速浏览器 - Spark Browser</title>
+  <!-- Tailwind CSS v3.4 CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdfa',
+              100: '#ccfbf1',
+              400: '#2dd4bf',
+              500: '#14b8a6',
+              600: '#0d9488',
+              700: '#0f766e',
+              800: '#115e59',
+              900: '#134e4a',
+            },
+            browser: {
+              lightBg: '#f1f3f4',
+              lightTab: '#ffffff',
+              lightActive: '#ffffff',
+              lightInactive: '#e8eaed',
+              darkBg: '#202124',
+              darkTab: '#292a2d',
+              darkActive: '#323639',
+              darkInactive: '#202124',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 基础通用样式与滚动条 */
+    * { box-sizing: border-box; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(156, 163, 175, 0.8); }
+
+    /* 标签页切角与形状 */
+    .tab-curve {
+      position: relative;
+      transition: all 0.15s ease;
+    }
+    .tab-active {
+      box-shadow: 0 -1px 4px rgba(0,0,0,0.06);
+    }
+
+    /* 模拟网页视图容器动画 */
+    .fade-enter {
+      animation: fadeIn 0.15s ease-out forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(2px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 加载进度条动画 */
+    @keyframes loadProgress {
+      0% { width: 0%; opacity: 1; }
+      50% { width: 75%; opacity: 1; }
+      100% { width: 100%; opacity: 0; }
+    }
+    .loading-bar-anim {
+      animation: loadProgress 0.4s ease-out forwards;
+    }
+
+    /* 开发者工具代码高亮 */
+    .code-font { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col bg-slate-900 text-slate-800 dark:text-slate-100 font-sans select-none">
+
+  <!-- 浏览器主外壳应用容器 -->
+  <div id="browser-app" class="flex-1 flex flex-col h-full bg-slate-100 dark:bg-zinc-900 overflow-hidden shadow-2xl relative">
+    
+    <!-- 1. 窗口标题栏与标签页条 -->
+    <div class="h-11 bg-slate-200 dark:bg-zinc-950 flex items-center px-2 pt-1 border-b border-slate-300 dark:border-zinc-800 z-30 select-none">
+      
+      <!-- 窗口控制小圆点 (macOS 风格) -->
+      <div class="flex items-center space-x-2 px-2 mr-2">
+        <button onclick="simulateWindowAction('close')" title="关闭" class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors"></button>
+        <button onclick="simulateWindowAction('minimize')" title="最小化" class="w-3 h-3 rounded-full bg-amber-500 hover:bg-amber-600 transition-colors"></button>
+        <button onclick="simulateWindowAction('maximize')" title="最大化 / 全屏" class="w-3 h-3 rounded-full bg-emerald-500 hover:bg-emerald-600 transition-colors"></button>
+      </div>
+
+      <!-- 动态标签页列表容器 -->
+      <div id="tabs-container" class="flex-1 flex items-end h-full space-x-1 overflow-x-auto no-scrollbar pr-2">
+        <!-- 标签项由 JS 动态渲染 -->
+      </div>
+
+      <!-- 新建标签页按钮 -->
+      <button onclick="createNewTab()" title="新建标签页 (Ctrl+T)" class="w-7 h-7 rounded-full hover:bg-slate-300 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-400 flex items-center justify-center transition text-sm">
+        <i class="fa-solid fa-plus"></i>
+      </button>
+
+      <!-- 顶栏右侧辅助工具 -->
+      <div class="flex items-center space-x-2 pl-3 ml-auto text-xs text-slate-500 dark:text-zinc-400">
+        <button onclick="togglePrincipleModal()" title="浏览器工作原理透视" class="px-2 py-1 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 hover:bg-teal-500/20 font-medium flex items-center space-x-1 transition">
+          <i class="fa-solid fa-layer-group"></i>
+          <span>原理探究</span>
+        </button>
+        <button onclick="toggleDarkMode()" title="切换明亮/暗黑主题" class="w-7 h-7 rounded hover:bg-slate-300 dark:hover:bg-zinc-800 flex items-center justify-center transition">
+          <i id="theme-icon" class="fa-solid fa-moon"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- 2. 导航工具栏 (后退、前进、刷新、主页、全能地址栏、功能菜单) -->
+    <div class="h-12 bg-white dark:bg-zinc-900 flex items-center px-3 space-x-2 border-b border-slate-200 dark:border-zinc-800 z-20">
+      <!-- 导航基础按钮 -->
+      <button id="btn-back" onclick="goBack()" title="后退 (Alt+←)" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition">
+        <i class="fa-solid fa-arrow-left text-sm"></i>
+      </button>
+      <button id="btn-forward" onclick="goForward()" title="前进 (Alt+→)" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition">
+        <i class="fa-solid fa-arrow-right text-sm"></i>
+      </button>
+      <button id="btn-reload" onclick="reloadPage()" title="重新加载此页 (F5)" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition">
+        <i id="reload-icon" class="fa-solid fa-rotate-right text-sm"></i>
+      </button>
+      <button onclick="navigateTo('spark://newtab')" title="主页" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition">
+        <i class="fa-solid fa-house text-sm"></i>
+      </button>
+
+      <!-- 智能多合一地址栏 (Omnibox) -->
+      <div class="flex-1 relative flex items-center">
+        <div class="w-full h-9 bg-slate-100 dark:bg-zinc-800 hover:bg-slate-200/80 dark:hover:bg-zinc-700/80 focus-within:!bg-white dark:focus-within:!bg-zinc-900 border border-transparent focus-within:!border-teal-500 rounded-full flex items-center px-3.5 space-x-2 transition-all shadow-inner">
+          <!-- 协议/安全锁图标 -->
+          <div id="security-badge" class="flex items-center text-teal-600 dark:text-teal-400 text-xs space-x-1 cursor-pointer" onclick="showSecurityInfo()">
+            <i class="fa-solid fa-lock text-[11px]"></i>
+          </div>
+
+          <!-- 地址输入框 -->
+          <input id="address-bar" type="text" placeholder="输入网址或在星光搜索中查询..." autocomplete="off"
+            class="flex-1 bg-transparent border-none outline-none text-xs text-slate-800 dark:text-zinc-100 placeholder-slate-400 dark:placeholder-zinc-500 font-mono tracking-wide"
+            onkeydown="if(event.key === 'Enter') handleAddressSubmit(this.value)"
+            onfocus="this.select()"
+          />
+
+          <!-- 一键清除/搜索联想 -->
+          <button id="btn-star" onclick="toggleBookmarkCurrent()" title="收藏此标签页" class="text-slate-400 hover:text-amber-500 transition px-1">
+            <i id="star-icon" class="fa-regular fa-star text-sm"></i>
+          </button>
+        </div>
+
+        <!-- 网址自动补全/搜索联想建议下拉框 -->
+        <div id="search-suggestions" class="hidden absolute top-10 left-0 right-0 bg-white dark:bg-zinc-800 rounded-xl shadow-xl border border-slate-200 dark:border-zinc-700 py-2 z-50 text-xs">
+          <!-- 动态建议项 -->
+        </div>
+      </div>
+
+      <!-- 右侧工具栏按钮 -->
+      <div class="flex items-center space-x-1">
+        <button onclick="toggleBookmarksBar()" title="切换书签栏" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition">
+          <i class="fa-solid fa-bookmark text-xs"></i>
+        </button>
+        <button onclick="toggleDevTools()" title="打开开发者工具 (F12)" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition" id="btn-devtools">
+          <i class="fa-solid fa-code text-xs"></i>
+        </button>
+        
+        <!-- 扩展/历史/设置下拉菜单触发器 -->
+        <div class="relative">
+          <button onclick="toggleMenu()" title="自定义及控制" class="w-8 h-8 rounded-full hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 flex items-center justify-center transition">
+            <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
+          </button>
+
+          <!-- 下拉菜单浮层 -->
+          <div id="main-menu" class="hidden absolute right-0 top-10 w-56 bg-white dark:bg-zinc-800 rounded-xl shadow-2xl border border-slate-200 dark:border-zinc-700 py-1.5 z-50 text-xs text-slate-700 dark:text-zinc-200">
+            <button onclick="createNewTab(); closeMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center justify-between">
+              <span><i class="fa-solid fa-plus w-5 text-slate-400"></i> 新建标签页</span>
+              <span class="text-[10px] text-slate-400">Ctrl+T</span>
+            </button>
+            <button onclick="navigateTo('spark://bookmarks'); closeMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center justify-between">
+              <span><i class="fa-solid fa-star w-5 text-amber-500"></i> 书签管理器</span>
+              <span class="text-[10px] text-slate-400">Ctrl+B</span>
+            </button>
+            <button onclick="navigateTo('spark://history'); closeMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center justify-between">
+              <span><i class="fa-solid fa-clock-rotate-left w-5 text-slate-400"></i> 历史记录</span>
+              <span class="text-[10px] text-slate-400">Ctrl+H</span>
+            </button>
+            <div class="my-1 border-t border-slate-200 dark:border-zinc-700"></div>
+            <button onclick="toggleDevTools(); closeMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center justify-between">
+              <span><i class="fa-solid fa-terminal w-5 text-teal-500"></i> 开发者工具</span>
+              <span class="text-[10px] text-slate-400">F12</span>
+            </button>
+            <button onclick="navigateTo('spark://settings'); closeMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center justify-between">
+              <span><i class="fa-solid fa-gear w-5 text-slate-400"></i> 设置中心</span>
+            </button>
+            <div class="my-1 border-t border-slate-200 dark:border-zinc-700"></div>
+            <button onclick="showAboutModal(); closeMenu();" class="w-full text-left px-4 py-2 hover:bg-slate-100 dark:hover:bg-zinc-700 flex items-center space-x-2 text-slate-500 dark:text-zinc-400">
+              <i class="fa-solid fa-circle-info w-5"></i> 关于星光极速浏览器
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 书签栏 (Bookmarks Bar) -->
+    <div id="bookmarks-bar" class="h-8 bg-slate-50 dark:bg-zinc-900/90 flex items-center px-3 space-x-1 border-b border-slate-200/80 dark:border-zinc-800 text-xs overflow-x-auto no-scrollbar z-10">
+      <!-- 书签项由 JS 动态生成 -->
+    </div>
+
+    <!-- 4. 网页加载进度条指示器 -->
+    <div id="page-progress-bar" class="h-[2px] bg-teal-500 w-0 transition-all duration-300 z-30"></div>
+
+    <!-- 5. 核心内容渲染主视口 (Viewport) -->
+    <div class="flex-1 flex overflow-hidden relative">
+      <!-- 虚拟网页主渲染区域 -->
+      <div id="webview-container" class="flex-1 h-full overflow-y-auto bg-white dark:bg-zinc-900 relative">
+        <!-- 页面 HTML 内容在此动态装载 -->
+      </div>
+
+      <!-- 6. 内置 F12 开发者工具面板 (DevTools) -->
+      <div id="devtools-panel" class="hidden w-1/2 h-full bg-slate-900 border-l border-slate-700 flex flex-col text-slate-200 font-mono text-xs z-20 shadow-2xl">
+        <!-- DevTools 顶栏 -->
+        <div class="h-9 bg-slate-950 flex items-center px-2 space-x-1 border-b border-slate-800">
+          <span class="text-teal-400 font-bold px-2 flex items-center space-x-1.5">
+            <i class="fa-solid fa-code"></i>
+            <span>DevTools</span>
+          </span>
+          <div class="flex space-x-1 ml-2">
+            <button onclick="switchDevTab('elements')" id="devtab-btn-elements" class="px-2.5 py-1 rounded bg-slate-800 text-teal-400 font-medium hover:bg-slate-700">Elements</button>
+            <button onclick="switchDevTab('console')" id="devtab-btn-console" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800">Console</button>
+            <button onclick="switchDevTab('network')" id="devtab-btn-network" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800">Network</button>
+            <button onclick="switchDevTab('sources')" id="devtab-btn-sources" class="px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800">Sources</button>
+          </div>
+          <div class="ml-auto flex items-center space-x-1">
+            <button onclick="toggleDevTools()" class="w-6 h-6 hover:bg-slate-800 rounded flex items-center justify-center text-slate-400 hover:text-slate-100">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- DevTools 内容区 -->
+        <div class="flex-1 overflow-y-auto p-3" id="devtools-content">
+          <!-- 动态展示面板内容 -->
+        </div>
+
+        <!-- 控制台输入栏 (仅在 Console 选项卡可见) -->
+        <div id="console-input-bar" class="hidden h-10 bg-slate-950 border-t border-slate-800 flex items-center px-3 space-x-2">
+          <span class="text-teal-400 font-bold">&gt;</span>
+          <input id="console-input" type="text" placeholder="输入 JavaScript 代码并回车执行..."
+            class="flex-1 bg-transparent text-slate-100 outline-none text-xs"
+            onkeydown="if(event.key === 'Enter') executeConsoleCode(this.value);"/>
+          <button onclick="executeConsoleCode(document.getElementById('console-input').value)" class="text-xs text-teal-400 hover:text-teal-300">Run</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. 底部状态栏 (显示链接悬停地址与网络状态) -->
+    <div id="statusbar" class="h-5 bg-slate-100 dark:bg-zinc-950 border-t border-slate-200 dark:border-zinc-800 px-3 flex items-center justify-between text-[10px] text-slate-500 dark:text-zinc-500">
+      <div id="status-hover-url" class="truncate max-w-md">就绪</div>
+      <div class="flex items-center space-x-3">
+        <span class="flex items-center space-x-1 text-emerald-500">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>网络正常</span>
+        </span>
+        <span id="current-viewport-size">100% 渲染引擎</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 8. 教学辅助弹窗：浏览器底层工作原理透视 -->
+  <div id="principle-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden fade-enter">
+      <div class="h-14 px-6 border-b border-slate-200 dark:border-zinc-800 flex items-center justify-between bg-slate-50 dark:bg-zinc-950">
+        <div class="flex items-center space-x-2 text-teal-600 dark:text-teal-400 font-bold text-base">
+          <i class="fa-solid fa-network-wired"></i>
+          <span>计算机网络与现代浏览器工作原理探究</span>
+        </div>
+        <button onclick="togglePrincipleModal()" class="w-8 h-8 rounded-full hover:bg-slate-200 dark:hover:bg-zinc-800 flex items-center justify-center text-slate-500">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto p-6 space-y-6 text-xs text-slate-700 dark:text-zinc-300 leading-relaxed">
+        <!-- 步骤1: URL解析 -->
+        <div class="bg-slate-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-slate-200 dark:border-zinc-700">
+          <h4 class="font-bold text-sm text-teal-600 dark:text-teal-400 mb-2 flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-teal-500 text-white flex items-center justify-center text-[10px]">1</span>
+            <span>URL 结构剖析与域名解析 (DNS)</span>
+          </h4>
+          <p class="mb-2">当在地址栏输入 <code class="bg-teal-500/10 text-teal-600 dark:text-teal-400 px-1 py-0.5 rounded">https://wiki.starlight.edu/article?id=101</code> 时：</p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono">
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="text-slate-400">协议 (Protocol)</div>
+              <div class="text-emerald-500 font-bold">https://</div>
+            </div>
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="text-slate-400">主机/域名 (Host)</div>
+              <div class="text-blue-500 font-bold">wiki.starlight.edu</div>
+            </div>
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="text-slate-400">路径 (Path)</div>
+              <div class="text-purple-500 font-bold">/article</div>
+            </div>
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="text-slate-400">参数 (Query)</div>
+              <div class="text-amber-500 font-bold">?id=101</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤2: 浏览器渲染流水线 -->
+        <div class="bg-slate-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-slate-200 dark:border-zinc-700">
+          <h4 class="font-bold text-sm text-blue-600 dark:text-blue-400 mb-2 flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-[10px]">2</span>
+            <span>关键渲染路径 (Critical Rendering Path)</span>
+          </h4>
+          <div class="flex flex-wrap items-center justify-between gap-2 text-center text-[11px]">
+            <div class="flex-1 min-w-[100px] p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="font-bold text-teal-500">1. HTML解析</div>
+              <div class="text-[10px] text-slate-400">构建 DOM 树</div>
+            </div>
+            <i class="fa-solid fa-arrow-right text-slate-400 text-xs"></i>
+            <div class="flex-1 min-w-[100px] p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="font-bold text-blue-500">2. CSS解析</div>
+              <div class="text-[10px] text-slate-400">构建 CSSOM 树</div>
+            </div>
+            <i class="fa-solid fa-arrow-right text-slate-400 text-xs"></i>
+            <div class="flex-1 min-w-[100px] p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="font-bold text-purple-500">3. 合成渲染树</div>
+              <div class="text-[10px] text-slate-400">Render Tree</div>
+            </div>
+            <i class="fa-solid fa-arrow-right text-slate-400 text-xs"></i>
+            <div class="flex-1 min-w-[100px] p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <div class="font-bold text-emerald-500">4. 布局与绘制</div>
+              <div class="text-[10px] text-slate-400">Layout & Paint</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 步骤3: HTTP状态码科普 -->
+        <div class="bg-slate-50 dark:bg-zinc-800/50 p-4 rounded-xl border border-slate-200 dark:border-zinc-700">
+          <h4 class="font-bold text-sm text-purple-600 dark:text-purple-400 mb-2 flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-purple-500 text-white flex items-center justify-center text-[10px]">3</span>
+            <span>常见 HTTP 响应状态码</span>
+          </h4>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px]">
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <span class="font-bold text-emerald-500">200 OK</span>
+              <p class="text-[10px] text-slate-400">请求成功，资源正常返回</p>
+            </div>
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <span class="font-bold text-blue-500">304 Not Modified</span>
+              <p class="text-[10px] text-slate-400">命中浏览器本地缓存</p>
+            </div>
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <span class="font-bold text-amber-500">404 Not Found</span>
+              <p class="text-[10px] text-slate-400">请求的页面资源不存在</p>
+            </div>
+            <div class="p-2 bg-white dark:bg-zinc-900 rounded border border-slate-200 dark:border-zinc-700">
+              <span class="font-bold text-red-500">500 Server Error</span>
+              <p class="text-[10px] text-slate-400">服务器内部发生错误</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 核心逻辑脚本 -->
+  <script>
+    // ==========================================
+    // 浏览器内部状态核心管理器
+    // ==========================================
+    const BrowserState = {
+      tabs: [],
+      activeTabId: null,
+      bookmarks: [
+        { id: 'bm-1', title: '星光百科', url: 'https://wiki.starlight.edu', icon: 'fa-book-atlas', color: 'text-blue-500' },
+        { id: 'bm-2', title: '代码实验室', url: 'https://code.starlight.dev', icon: 'fa-laptop-code', color: 'text-emerald-500' },
+        { id: 'bm-3', title: '涂鸦画板', url: 'https://paint.starlight.app', icon: 'fa-palette', color: 'text-pink-500' },
+        { id: 'bm-4', title: '智能问答 AI', url: 'https://chat.starlight.ai', icon: 'fa-robot', color: 'text-purple-500' },
+        { id: 'bm-5', title: '科学计算器', url: 'https://calc.starlight.app', icon: 'fa-calculator', color: 'text-amber-500' },
+        { id: 'bm-6', title: '离线恐龙小游戏', url: 'https://game.starlight.net', icon: 'fa-gamepad', color: 'text-teal-500' }
+      ],
+      history: [],
+      showBookmarksBar: true,
+      darkMode: false,
+      devToolsOpen: false,
+      currentDevTab: 'elements',
+      consoleLogs: [],
+      networkRequests: [],
+    };
+
+    // ==========================================
+    // 标签页管理 (Tab System)
+    // ==========================================
+    function createNewTab(url = 'spark://newtab', title = '新标签页') {
+      const tabId = 'tab_' + Date.now() + '_' + Math.floor(Math.random()*1000);
+      const newTab = {
+        id: tabId,
+        title: title,
+        url: url,
+        historyStack: [url],
+        currentIndex: 0,
+        icon: getFaviconForUrl(url),
+        loading: false
+      };
+      BrowserState.tabs.push(newTab);
+      switchTab(tabId);
+      recordHistory(url, title);
+    }
+
+    function switchTab(tabId) {
+      BrowserState.activeTabId = tabId;
+      renderTabs();
+      updateNavigationControls();
+      loadActiveTabContent();
+    }
+
+    function closeTab(tabId, event) {
+      if (event) event.stopPropagation();
+      const index = BrowserState.tabs.findIndex(t => t.id === tabId);
+      if (index === -1) return;
+
+      BrowserState.tabs.splice(index, 1);
+      if (BrowserState.tabs.length === 0) {
+        createNewTab();
+      } else if (BrowserState.activeTabId === tabId) {
+        const nextActiveIndex = Math.max(0, index - 1);
+        switchTab(BrowserState.tabs[nextActiveIndex].id);
+      } else {
+        renderTabs();
+      }
+    }
+
+    function getActiveTab() {
+      return BrowserState.tabs.find(t => t.id === BrowserState.activeTabId) || BrowserState.tabs[0];
+    }
+
+    function renderTabs() {
+      const container = document.getElementById('tabs-container');
+      container.innerHTML = '';
+
+      BrowserState.tabs.forEach(tab => {
+        const isActive = tab.id === BrowserState.activeTabId;
+        const tabEl = document.createElement('div');
+        tabEl.className = `group max-w-[200px] min-w-[120px] flex-1 h-9 px-3 rounded-t-lg flex items-center justify-between text-xs cursor-pointer border-t border-x transition-all select-none tab-curve ${
+          isActive 
+            ? 'bg-white dark:bg-zinc-900 text-slate-800 dark:text-zinc-100 border-slate-300 dark:border-zinc-800 tab-active font-medium' 
+            : 'bg-transparent hover:bg-slate-300/60 dark:hover:bg-zinc-800/60 text-slate-600 dark:text-zinc-400 border-transparent'
+        }`;
+        tabEl.onclick = () => switchTab(tab.id);
+
+        tabEl.innerHTML = `
+          <div class="flex items-center space-x-2 truncate flex-1 mr-1">
+            <i class="${tab.icon} text-xs ${isActive ? 'text-teal-500' : 'text-slate-400'}"></i>
+            <span class="truncate">${tab.title}</span>
+          </div>
+          <button onclick="closeTab('${tab.id}', event)" title="关闭标签页" class="w-4 h-4 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-zinc-200 hover:bg-slate-200 dark:hover:bg-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity">
+            <i class="fa-solid fa-xmark text-[10px]"></i>
+          </button>
+        `;
+        container.appendChild(tabEl);
+      });
+    }
+
+    // ==========================================
+    // 导航与地址栏控制器 (Navigation & Omnibox)
+    // ==========================================
+    function handleAddressSubmit(inputVal) {
+      inputVal = inputVal.trim();
+      if (!inputVal) return;
+
+      let targetUrl = inputVal;
+      // 判断是网址还是搜索关键词
+      if (inputVal.startsWith('http://') || inputVal.startsWith('https://') || inputVal.startsWith('spark://')) {
+        targetUrl = inputVal;
+      } else if (inputVal.includes('.') && !inputVal.includes(' ')) {
+        targetUrl = 'https://' + inputVal;
+      } else {
+        // 搜索关键词
+        targetUrl = 'spark://search?q=' + encodeURIComponent(inputVal);
+      }
+
+      navigateTo(targetUrl);
+    }
+
+    function navigateTo(url) {
+      const tab = getActiveTab();
+      if (!tab) return;
+
+      // 更新标签页历史
+      if (tab.historyStack[tab.currentIndex] !== url) {
+        tab.historyStack = tab.historyStack.slice(0, tab.currentIndex + 1);
+        tab.historyStack.push(url);
+        tab.currentIndex = tab.historyStack.length - 1;
+      }
+
+      tab.url = url;
+      tab.icon = getFaviconForUrl(url);
+      
+      // 触发加载动画与渲染
+      triggerLoadingAnimation();
+      updateNavigationControls();
+      loadActiveTabContent();
+    }
+
+    function goBack() {
+      const tab = getActiveTab();
+      if (tab && tab.currentIndex > 0) {
+        tab.currentIndex--;
+        tab.url = tab.historyStack[tab.currentIndex];
+        tab.icon = getFaviconForUrl(tab.url);
+        triggerLoadingAnimation();
+        updateNavigationControls();
+        loadActiveTabContent();
+      }
+    }
+
+    function goForward() {
+      const tab = getActiveTab();
+      if (tab && tab.currentIndex < tab.historyStack.length - 1) {
+        tab.currentIndex++;
+        tab.url = tab.historyStack[tab.currentIndex];
+        tab.icon = getFaviconForUrl(tab.url);
+        triggerLoadingAnimation();
+        updateNavigationControls();
+        loadActiveTabContent();
+      }
+    }
+
+    function reloadPage() {
+      const icon = document.getElementById('reload-icon');
+      icon.classList.add('fa-spin');
+      triggerLoadingAnimation();
+      setTimeout(() => {
+        icon.classList.remove('fa-spin');
+        loadActiveTabContent();
+      }, 400);
+    }
+
+    function updateNavigationControls() {
+      const tab = getActiveTab();
+      if (!tab) return;
+
+      document.getElementById('address-bar').value = tab.url;
+      document.getElementById('btn-back').disabled = (tab.currentIndex <= 0);
+      document.getElementById('btn-forward').disabled = (tab.currentIndex >= tab.historyStack.length - 1);
+
+      // 更新收藏星标状态
+      const isBookmarked = BrowserState.bookmarks.some(b => b.url === tab.url);
+      const starIcon = document.getElementById('star-icon');
+      if (isBookmarked) {
+        starIcon.className = 'fa-solid fa-star text-amber-500 text-sm';
+      } else {
+        starIcon.className = 'fa-regular fa-star text-slate-400 text-sm';
+      }
+    }
+
+    function triggerLoadingAnimation() {
+      const bar = document.getElementById('page-progress-bar');
+      bar.className = 'h-[2px] bg-teal-500 w-0 loading-bar-anim z-30';
+      setTimeout(() => {
+        bar.className = 'h-[2px] bg-teal-500 w-0 transition-all duration-300 z-30';
+      }, 450);
+    }
+
+    function getFaviconForUrl(url) {
+      if (url.startsWith('spark://newtab')) return 'fa-solid fa-compass';
+      if (url.startsWith('spark://search')) return 'fa-solid fa-magnifying-glass';
+      if (url.startsWith('spark://history')) return 'fa-solid fa-clock-rotate-left';
+      if (url.startsWith('spark://bookmarks')) return 'fa-solid fa-star';
+      if (url.startsWith('spark://settings')) return 'fa-solid fa-gear';
+      if (url.includes('wiki')) return 'fa-solid fa-book-atlas';
+      if (url.includes('code')) return 'fa-solid fa-laptop-code';
+      if (url.includes('paint')) return 'fa-solid fa-palette';
+      if (url.includes('chat')) return 'fa-solid fa-robot';
+      if (url.includes('calc')) return 'fa-solid fa-calculator';
+      if (url.includes('game')) return 'fa-solid fa-gamepad';
+      return 'fa-solid fa-globe';
+    }
+
+    // ==========================================
+    // 虚拟互联网页面渲染引擎 (Web Ecosystem)
+    // ==========================================
+    function loadActiveTabContent() {
+      const tab = getActiveTab();
+      if (!tab) return;
+
+      const container = document.getElementById('webview-container');
+      const url = tab.url;
+
+      // 记录网络请求到 DevTools Network
+      recordNetworkRequest(url);
+
+      if (url === 'spark://newtab') {
+        tab.title = '新标签页';
+        renderNewTabPage(container);
+      } else if (url.startsWith('spark://search')) {
+        const query = new URLSearchParams(url.split('?')[1] || '').get('q') || '';
+        tab.title = query ? `${query} - 星光搜索` : '星光搜索';
+        renderSearchPage(container, query);
+      } else if (url === 'spark://history') {
+        tab.title = '历史记录';
+        renderHistoryPage(container);
+      } else if (url === 'spark://bookmarks') {
+        tab.title = '书签管理器';
+        renderBookmarksPage(container);
+      } else if (url === 'spark://settings') {
+        tab.title = '浏览器设置';
+        renderSettingsPage(container);
+      } else if (url.includes('wiki.starlight.edu')) {
+        tab.title = '星光百科 - 全学科知识图谱';
+        renderWikiPage(container);
+      } else if (url.includes('code.starlight.dev')) {
+        tab.title = '在线代码实验室 - Web Sandbox';
+        renderCodeLabPage(container);
+      } else if (url.includes('paint.starlight.app')) {
+        tab.title = '极速涂鸦画板 - Paint App';
+        renderPaintPage(container);
+      } else if (url.includes('chat.starlight.ai')) {
+        tab.title = 'AI 智能问答助理';
+        renderChatAiPage(container);
+      } else if (url.includes('calc.starlight.app')) {
+        tab.title = '科学计算器';
+        renderCalculatorPage(container);
+      } else if (url.includes('game.starlight.net')) {
+        tab.title = '恐龙跳跃小游戏 (离线彩蛋)';
+        renderDinoGamePage(container);
+      } else {
+        // 自定义或未知网页
+        tab.title = url;
+        renderCustomWebPage(container, url);
+      }
+
+      renderTabs();
+      recordHistory(url, tab.title);
+      if (BrowserState.devToolsOpen) {
+        updateDevToolsView();
+      }
+    }
+
+    // --- 页面1: 新标签页 (New Tab) ---
+    function renderNewTabPage(container) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      const dateStr = now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+
+      container.innerHTML = `
+        <div class="min-h-full flex flex-col items-center justify-center p-6 fade-enter">
+          <!-- 动态时间与问候 -->
+          <div class="text-center mb-8">
+            <div class="text-6xl font-extralight tracking-tight text-slate-800 dark:text-zinc-100 font-mono mb-2">${timeStr}</div>
+            <div class="text-xs text-slate-500 dark:text-zinc-400 font-medium">${dateStr} · 探索广袤的互联网络</div>
+          </div>
+
+          <!-- 主搜索大框 -->
+          <div class="w-full max-w-2xl mb-10">
+            <div class="relative flex items-center bg-white dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-2xl p-2 shadow-lg hover:shadow-xl transition focus-within:ring-2 focus-within:ring-teal-500">
+              <i class="fa-solid fa-magnifying-glass text-slate-400 ml-3 mr-2 text-base"></i>
+              <input id="main-search-input" type="text" placeholder="在互联网中搜索或输入网址..."
+                class="flex-1 bg-transparent border-none outline-none text-sm text-slate-800 dark:text-zinc-100 placeholder-slate-400"
+                onkeydown="if(event.key === 'Enter') handleAddressSubmit(this.value);"
+              />
+              <button onclick="handleAddressSubmit(document.getElementById('main-search-input').value)" class="px-5 py-2 rounded-xl bg-teal-500 hover:bg-teal-600 text-white text-xs font-medium transition shadow-md">
+                搜索
+              </button>
+            </div>
+          </div>
+
+          <!-- 热门快速访问磁贴卡片 -->
+          <div class="w-full max-w-3xl">
+            <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 px-2">常用快捷入口</div>
+            <div class="grid grid-cols-3 sm:grid-cols-6 gap-4">
+              ${BrowserState.bookmarks.map(bm => `
+                <div onclick="navigateTo('${bm.url}')" class="flex flex-col items-center p-3 rounded-2xl bg-slate-50 dark:bg-zinc-800/60 hover:bg-slate-100 dark:hover:bg-zinc-800 border border-slate-200/60 dark:border-zinc-700/60 cursor-pointer transition transform hover:-translate-y-1 shadow-sm group">
+                  <div class="w-12 h-12 rounded-xl bg-white dark:bg-zinc-700 shadow-sm flex items-center justify-center mb-2 group-hover:scale-105 transition">
+                    <i class="fa-solid ${bm.icon} text-lg ${bm.color}"></i>
+                  </div>
+                  <span class="text-xs font-medium text-slate-700 dark:text-zinc-200 truncate w-full text-center">${bm.title}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- 页面2: 搜索结果页 (Search Results) ---
+    function renderSearchPage(container, query) {
+      const mockDatabase = [
+        { title: '星光百科：计算机与操作系统工作原理', url: 'https://wiki.starlight.edu/cs', desc: '探索现代计算机底层架构、CPU指令调度、内存分段分页以及操作系统的核心运行机制。', tag: '科学百科' },
+        { title: '在线代码沙箱 (Web CodeLab)', url: 'https://code.starlight.dev', desc: '免安装、秒级运行的前端代码实验室，支持编写实时 HTML、CSS 和 JavaScript 原生脚本。', tag: '开发者工具' },
+        { title: '极速在线涂鸦画板与设计工具', url: 'https://paint.starlight.app', desc: '轻量级 Canvas 画板应用，支持多种笔触粗细、色彩吸管、橡皮擦与一键本地导出。', tag: '实用工具' },
+        { title: '星光 AI 智能学科助教与大模型问答', url: 'https://chat.starlight.ai', desc: '支持数学推导、代码生成、文章润色与自然语言对话的云端智能问答助手。', tag: '人工智能' },
+        { title: '高精度多功能科学计算器', url: 'https://calc.starlight.app', desc: '支持三角函数、开方、对数运算与复杂代数运算的网页版科学计算器。', tag: '学习工具' },
+        { title: 'Chrome 经典恐龙跳跃离线小游戏', url: 'https://game.starlight.net', desc: '断网时陪伴亿万用户的经典像素风跳跃游戏，操控小恐龙躲避障碍物并刷新最高分！', tag: '休闲娱乐' },
+      ];
+
+      const filtered = query 
+        ? mockDatabase.filter(d => d.title.includes(query) || d.desc.includes(query) || d.tag.includes(query))
+        : mockDatabase;
+
+      container.innerHTML = `
+        <div class="max-w-4xl mx-auto p-6 fade-enter">
+          <div class="flex items-center space-x-3 mb-6 pb-4 border-b border-slate-200 dark:border-zinc-800">
+            <span class="text-teal-600 dark:text-teal-400 font-bold text-lg"><i class="fa-solid fa-magnifying-glass mr-2"></i>星光搜索</span>
+            <span class="text-xs text-slate-400">找到约 ${filtered.length} 条关于 "${query || '全部'}" 的搜索结果 (用时 0.02 秒)</span>
+          </div>
+
+          <div class="space-y-6">
+            ${filtered.length > 0 ? filtered.map(item => `
+              <div class="group bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-700/60 hover:border-teal-500 transition">
+                <div class="flex items-center space-x-2 text-[11px] text-teal-600 dark:text-teal-400 mb-1">
+                  <span class="bg-teal-500/10 px-1.5 py-0.5 rounded font-medium">${item.tag}</span>
+                  <span class="font-mono text-slate-400">${item.url}</span>
+                </div>
+                <h3 onclick="navigateTo('${item.url}')" class="text-base font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer mb-1.5">
+                  ${item.title}
+                </h3>
+                <p class="text-xs text-slate-600 dark:text-zinc-300 leading-relaxed">${item.desc}</p>
+              </div>
+            `).join('') : `
+              <div class="text-center py-16 text-slate-400">
+                <i class="fa-solid fa-face-frown text-4xl mb-3 text-slate-300 dark:text-zinc-700"></i>
+                <p class="text-sm">未检索到与 "${query}" 相关的网页，请尝试换一个关键词或检查拼写。</p>
+              </div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    // --- 页面3: 在线代码实验室 (CodeLab Sandbox) ---
+    function renderCodeLabPage(container) {
+      container.innerHTML = `
+        <div class="h-full flex flex-col p-4 bg-slate-900 text-slate-100 fade-enter">
+          <div class="h-10 flex items-center justify-between border-b border-slate-800 pb-2 mb-2">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-laptop-code text-emerald-400"></i>
+              <span class="font-bold text-sm">Web 前端代码实时实验室</span>
+            </div>
+            <button onclick="runCodeLabSandbox()" class="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-xs font-bold transition flex items-center space-x-1">
+              <i class="fa-solid fa-play"></i>
+              <span>运行代码</span>
+            </button>
+          </div>
+
+          <div class="flex-1 grid grid-cols-1 md:grid-cols-2 gap-3 min-h-0">
+            <!-- 代码编辑器 -->
+            <div class="flex flex-col bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+              <div class="h-8 bg-slate-900 px-3 flex items-center text-xs text-slate-400 border-b border-slate-800">
+                <span>index.html / CSS / JS</span>
+              </div>
+              <textarea id="sandbox-code-editor" class="flex-1 p-3 bg-transparent text-emerald-400 font-mono text-xs outline-none resize-none leading-relaxed" spellcheck="false">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+  &lt;style&gt;
+    body {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      color: #38bdf8;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      padding: 24px;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+      text-align: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    button {
+      background: #0ea5e9;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+  &lt;div class="card"&gt;
+    &lt;h2&gt;🚀 Hello Spark Web!&lt;/h2&gt;
+    &lt;p&gt;这是一个在模拟浏览器内运行的实时网页。&lt;/p&gt;
+    &lt;button onclick="document.getElementById('cnt').innerText++"&gt;点赞: &lt;span id="cnt"&gt;0&lt;/span&gt;&lt;/button&gt;
+  &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</textarea>
+            </div>
+
+            <!-- 实时预览沙箱 -->
+            <div class="flex flex-col bg-white rounded-xl border border-slate-800 overflow-hidden">
+              <div class="h-8 bg-slate-100 px-3 flex items-center text-xs text-slate-500 border-b border-slate-200">
+                <span>实时预览 (Live Preview)</span>
+              </div>
+              <iframe id="sandbox-preview-frame" class="flex-1 w-full h-full border-none bg-slate-900"></iframe>
+            </div>
+          </div>
+        </div>
+      `;
+      setTimeout(runCodeLabSandbox, 100);
+    }
+
+    function runCodeLabSandbox() {
+      const editor = document.getElementById('sandbox-code-editor');
+      const frame = document.getElementById('sandbox-preview-frame');
+      if (editor && frame) {
+        frame.srcdoc = editor.value;
+      }
+    }
+
+    // --- 页面4: 极速涂鸦画板 (Paint App) ---
+    function renderPaintPage(container) {
+      container.innerHTML = `
+        <div class="h-full flex flex-col p-4 bg-slate-50 dark:bg-zinc-900 fade-enter">
+          <div class="h-12 bg-white dark:bg-zinc-800 rounded-xl px-4 flex items-center justify-between border border-slate-200 dark:border-zinc-700 mb-3 shadow-sm">
+            <div class="flex items-center space-x-4 text-xs">
+              <span class="font-bold text-slate-800 dark:text-zinc-100"><i class="fa-solid fa-palette text-pink-500 mr-1.5"></i>在线画板</span>
+              
+              <!-- 颜色选择 -->
+              <div class="flex items-center space-x-1.5">
+                <span>颜色:</span>
+                <input type="color" id="paint-color" value="#0d9488" class="w-6 h-6 rounded cursor-pointer border-none bg-transparent">
+              </div>
+
+              <!-- 笔触粗细 -->
+              <div class="flex items-center space-x-1.5">
+                <span>粗细:</span>
+                <input type="range" id="paint-size" min="1" max="30" value="4" class="w-20 accent-teal-500">
+              </div>
+
+              <!-- 模式切换 -->
+              <div class="flex items-center space-x-1 bg-slate-100 dark:bg-zinc-700 p-1 rounded-lg">
+                <button id="paint-pen-btn" onclick="setPaintTool('pen')" class="px-2.5 py-1 bg-white dark:bg-zinc-800 rounded text-teal-600 dark:text-teal-400 font-bold shadow-xs">画笔</button>
+                <button id="paint-eraser-btn" onclick="setPaintTool('eraser')" class="px-2.5 py-1 text-slate-600 dark:text-zinc-300">橡皮擦</button>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2">
+              <button onclick="clearPaintCanvas()" class="px-3 py-1.5 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 rounded-lg text-xs font-medium transition">
+                <i class="fa-solid fa-trash-can mr-1"></i>清空
+              </button>
+            </div>
+          </div>
+
+          <!-- Canvas 画布容器 -->
+          <div class="flex-1 bg-white dark:bg-zinc-950 rounded-2xl border border-slate-200 dark:border-zinc-800 overflow-hidden relative shadow-inner flex items-center justify-center">
+            <canvas id="paint-canvas" width="800" height="500" class="cursor-crosshair bg-white"></canvas>
+          </div>
+        </div>
+      `;
+      initPaintCanvas();
+    }
+
+    let paintContext = null;
+    let isPainting = false;
+    let paintTool = 'pen';
+
+    function initPaintCanvas() {
+      const canvas = document.getElementById('paint-canvas');
+      if (!canvas) return;
+      paintContext = canvas.getContext('2d');
+      paintContext.lineCap = 'round';
+      paintContext.lineJoin = 'round';
+
+      canvas.onpointerdown = (e) => {
+        isPainting = true;
+        paintContext.beginPath();
+        const rect = canvas.getBoundingClientRect();
+        paintContext.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+      };
+
+      canvas.onpointermove = (e) => {
+        if (!isPainting) return;
+        const rect = canvas.getBoundingClientRect();
+        const color = document.getElementById('paint-color').value;
+        const size = document.getElementById('paint-size').value;
+
+        paintContext.strokeStyle = (paintTool === 'eraser') ? '#ffffff' : color;
+        paintContext.lineWidth = size;
+        paintContext.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+        paintContext.stroke();
+      };
+
+      window.onpointerup = () => { isPainting = false; };
+    }
+
+    function setPaintTool(tool) {
+      paintTool = tool;
+      document.getElementById('paint-pen-btn').className = tool === 'pen' 
+        ? 'px-2.5 py-1 bg-white dark:bg-zinc-800 rounded text-teal-600 dark:text-teal-400 font-bold shadow-xs' 
+        : 'px-2.5 py-1 text-slate-600 dark:text-zinc-300';
+      document.getElementById('paint-eraser-btn').className = tool === 'eraser' 
+        ? 'px-2.5 py-1 bg-white dark:bg-zinc-800 rounded text-teal-600 dark:text-teal-400 font-bold shadow-xs' 
+        : 'px-2.5 py-1 text-slate-600 dark:text-zinc-300';
+    }
+
+    function clearPaintCanvas() {
+      const canvas = document.getElementById('paint-canvas');
+      if (canvas && paintContext) {
+        paintContext.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+
+    // --- 页面5: AI 智能问答 (Chat AI) ---
+    function renderChatAiPage(container) {
+      container.innerHTML = `
+        <div class="h-full flex flex-col max-w-3xl mx-auto p-4 fade-enter">
+          <div class="flex items-center space-x-2 py-3 border-b border-slate-200 dark:border-zinc-800">
+            <i class="fa-solid fa-robot text-purple-500 text-lg"></i>
+            <span class="font-bold text-sm text-slate-800 dark:text-zinc-100">星光智能 AI 学科助手</span>
+          </div>
+
+          <div id="chat-messages" class="flex-1 overflow-y-auto py-4 space-y-4 text-xs">
+            <div class="flex items-start space-x-2.5">
+              <div class="w-7 h-7 rounded-full bg-purple-500 text-white flex items-center justify-center flex-shrink-0">
+                <i class="fa-solid fa-robot text-xs"></i>
+              </div>
+              <div class="bg-slate-100 dark:bg-zinc-800 p-3 rounded-2xl max-w-lg leading-relaxed text-slate-800 dark:text-zinc-200">
+                你好！我是内置在星光浏览器中的智能助教。你可以向我提问关于计算机网络、物理定律、数学公式或编程问题！
+              </div>
+            </div>
+          </div>
+
+          <div class="h-14 flex items-center space-x-2 pt-2 border-t border-slate-200 dark:border-zinc-800">
+            <input id="chat-input" type="text" placeholder="输入你想探讨的问题，如'解释一下DNS解析过程'..."
+              class="flex-1 bg-slate-100 dark:bg-zinc-800 border border-slate-200 dark:border-zinc-700 rounded-xl px-4 py-2 text-xs outline-none focus:ring-2 focus:ring-purple-500 text-slate-800 dark:text-zinc-100"
+              onkeydown="if(event.key==='Enter') sendChatMessage(this.value);"
+            />
+            <button onclick="sendChatMessage(document.getElementById('chat-input').value)" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition shadow-md">
+              发送
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    function sendChatMessage(text) {
+      if (!text.trim()) return;
+      const input = document.getElementById('chat-input');
+      input.value = '';
+
+      const container = document.getElementById('chat-messages');
+      // 用户气泡
+      container.innerHTML += `
+        <div class="flex items-start justify-end space-x-2.5">
+          <div class="bg-teal-600 text-white p-3 rounded-2xl max-w-lg leading-relaxed">
+            ${text}
+          </div>
+        </div>
+      `;
+
+      // AI 回复模拟
+      const responses = {
+        'dns': 'DNS (Domain Name System) 域名系统就像互联网的电话簿。它将人类易记的域名（如 starlight.edu）翻译为机器可读的 IP 地址（如 192.0.2.1）。整个过程包括本地缓存查询、递归解析器查询、根域名服务器、顶级域名服务器（TLD）以及权威域名服务器的阶梯式解析。',
+        'http': 'HTTP (超文本传输协议) 是无状态的应用层协议。HTTPS 在其基础上增加了 SSL/TLS 加密层，保证了数据在传输过程中的保密性、完整性与身份认证。常见方法包括 GET（读取）、POST（提交）、PUT（更新）和 DELETE（删除）。',
+        'default': `关于「${text}」：在现代互联网技术中，浏览器作为人机交互的窗口，通过解析 HTML 构建骨架、加载 CSS 赋予样貌、执行 JS 赋予交互灵魂，并经由 TCP/IP 协议栈与全球服务器高效交换数据。`
+      };
+
+      const reply = text.toLowerCase().includes('dns') ? responses.dns : (text.toLowerCase().includes('http') ? responses.http : responses.default);
+
+      setTimeout(() => {
+        container.innerHTML += `
+          <div class="flex items-start space-x-2.5">
+            <div class="w-7 h-7 rounded-full bg-purple-500 text-white flex items-center justify-center flex-shrink-0">
+              <i class="fa-solid fa-robot text-xs"></i>
+            </div>
+            <div class="bg-slate-100 dark:bg-zinc-800 p-3 rounded-2xl max-w-lg leading-relaxed text-slate-800 dark:text-zinc-200">
+              ${reply}
+            </div>
+          </div>
+        `;
+        container.scrollTop = container.scrollHeight;
+      }, 500);
+    }
+
+    // --- 页面6: 科学计算器 (Calculator) ---
+    function renderCalculatorPage(container) {
+      container.innerHTML = `
+        <div class="h-full flex items-center justify-center p-6 bg-slate-100 dark:bg-zinc-950 fade-enter">
+          <div class="w-80 bg-white dark:bg-zinc-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-zinc-800 p-6 flex flex-col space-y-4">
+            <div class="text-xs font-bold text-slate-400 flex justify-between items-center">
+              <span>科学计算器</span>
+              <i class="fa-solid fa-calculator text-amber-500"></i>
+            </div>
+
+            <!-- 显示屏 -->
+            <div class="bg-slate-50 dark:bg-zinc-950 rounded-2xl p-4 border border-slate-200 dark:border-zinc-800 text-right">
+              <div id="calc-expr" class="text-xs text-slate-400 font-mono h-4 truncate">0</div>
+              <div id="calc-display" class="text-2xl font-bold text-slate-800 dark:text-zinc-100 font-mono truncate">0</div>
+            </div>
+
+            <!-- 按键区 -->
+            <div class="grid grid-cols-4 gap-2.5 text-xs font-mono font-bold">
+              <button onclick="calcClear()" class="p-3 bg-rose-500/10 text-rose-600 rounded-xl hover:bg-rose-500/20 transition">C</button>
+              <button onclick="calcInput('(')" class="p-3 bg-slate-100 dark:bg-zinc-800 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">(</button>
+              <button onclick="calcInput(')')" class="p-3 bg-slate-100 dark:bg-zinc-800 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">)</button>
+              <button onclick="calcInput('/')" class="p-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition">÷</button>
+
+              <button onclick="calcInput('7')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">7</button>
+              <button onclick="calcInput('8')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">8</button>
+              <button onclick="calcInput('9')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">9</button>
+              <button onclick="calcInput('*')" class="p-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition">×</button>
+
+              <button onclick="calcInput('4')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">4</button>
+              <button onclick="calcInput('5')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">5</button>
+              <button onclick="calcInput('6')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">6</button>
+              <button onclick="calcInput('-')" class="p-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition">-</button>
+
+              <button onclick="calcInput('1')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">1</button>
+              <button onclick="calcInput('2')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">2</button>
+              <button onclick="calcInput('3')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">3</button>
+              <button onclick="calcInput('+')" class="p-3 bg-amber-500 text-white rounded-xl hover:bg-amber-600 transition">+</button>
+
+              <button onclick="calcInput('0')" class="col-span-2 p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">0</button>
+              <button onclick="calcInput('.')" class="p-3 bg-slate-50 dark:bg-zinc-800/60 rounded-xl hover:bg-slate-200 dark:hover:bg-zinc-700 transition">.</button>
+              <button onclick="calcCalculate()" class="p-3 bg-teal-500 text-white rounded-xl hover:bg-teal-600 transition">=</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    let calcExpression = '';
+    function calcInput(char) {
+      calcExpression += char;
+      document.getElementById('calc-display').innerText = calcExpression;
+    }
+    function calcClear() {
+      calcExpression = '';
+      document.getElementById('calc-expr').innerText = '0';
+      document.getElementById('calc-display').innerText = '0';
+    }
+    function calcCalculate() {
+      try {
+        const res = eval(calcExpression);
+        document.getElementById('calc-expr').innerText = calcExpression + ' =';
+        document.getElementById('calc-display').innerText = res;
+        calcExpression = String(res);
+      } catch (e) {
+        document.getElementById('calc-display').innerText = 'Error';
+        calcExpression = '';
+      }
+    }
+
+    // --- 页面7: 恐龙跳跃离线小游戏 (Dino Game) ---
+    function renderDinoGamePage(container) {
+      container.innerHTML = `
+        <div class="h-full flex flex-col items-center justify-center p-6 bg-slate-100 dark:bg-zinc-950 fade-enter select-none">
+          <div class="text-center mb-4">
+            <h2 class="text-xl font-bold text-slate-800 dark:text-zinc-100 mb-1">🦖 恐龙小跳跃 (Chrome 离线彩蛋)</h2>
+            <p class="text-xs text-slate-500">按 <kbd class="px-2 py-0.5 bg-slate-200 dark:bg-zinc-800 rounded font-mono">空格键</kbd> 或点击屏幕起跳，避开仙人掌障碍物！</p>
+          </div>
+
+          <div class="relative bg-white dark:bg-zinc-900 border-2 border-slate-300 dark:border-zinc-700 rounded-2xl overflow-hidden shadow-xl" style="width:600px; height:240px;" onclick="dinoJump()">
+            <canvas id="dino-canvas" width="600" height="240"></canvas>
+            <div id="dino-gameover" class="hidden absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white">
+              <span class="text-lg font-bold mb-2">GAME OVER</span>
+              <button onclick="startDinoGame()" class="px-4 py-1.5 bg-teal-500 rounded-lg text-xs font-bold">重新开始</button>
+            </div>
+            <div class="absolute top-3 right-4 font-mono text-xs font-bold text-slate-600 dark:text-zinc-400">
+              得分: <span id="dino-score">0</span>
+            </div>
+          </div>
+        </div>
+      `;
+      startDinoGame();
+    }
+
+    let dinoLoopId = null;
+    let dinoState = { y: 0, vy: 0, score: 0, isJumping: false, obstacles: [], gameOver: false };
+
+    function startDinoGame() {
+      const canvas = document.getElementById('dino-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      dinoState = { y: 170, vy: 0, score: 0, isJumping: false, obstacles: [{ x: 500, w: 20, h: 40 }], gameOver: false };
+      document.getElementById('dino-gameover').classList.add('hidden');
+
+      if (dinoLoopId) cancelAnimationFrame(dinoLoopId);
+
+      function loop() {
+        if (dinoState.gameOver) return;
+
+        // 物理与状态更新
+        dinoState.y += dinoState.vy;
+        dinoState.vy += 0.8; // 重力
+        if (dinoState.y >= 170) {
+          dinoState.y = 170;
+          dinoState.vy = 0;
+          dinoState.isJumping = false;
+        }
+
+        dinoState.score++;
+        document.getElementById('dino-score').innerText = Math.floor(dinoState.score / 5);
+
+        // 障碍物移动
+        dinoState.obstacles.forEach(obs => { obs.x -= 5; });
+        if (dinoState.obstacles[0] && dinoState.obstacles[0].x < -30) {
+          dinoState.obstacles.shift();
+          dinoState.obstacles.push({ x: 600 + Math.random()*150, w: 20 + Math.random()*15, h: 35 + Math.random()*20 });
+        }
+
+        // 碰撞检测
+        const dinoBox = { x: 50, y: dinoState.y, w: 30, h: 40 };
+        dinoState.obstacles.forEach(obs => {
+          if (dinoBox.x < obs.x + obs.w && dinoBox.x + dinoBox.w > obs.x &&
+              dinoBox.y + dinoBox.h > 210 - obs.h) {
+            dinoState.gameOver = true;
+            document.getElementById('dino-gameover').classList.remove('hidden');
+          }
+        });
+
+        // 绘制画面
+        ctx.clearRect(0, 0, 600, 240);
+
+        // 地平线
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, 210);
+        ctx.lineTo(600, 210);
+        ctx.stroke();
+
+        // 恐龙
+        ctx.fillStyle = '#0d9488';
+        ctx.fillRect(dinoBox.x, dinoBox.y, dinoBox.w, dinoBox.h);
+
+        // 仙人掌
+        ctx.fillStyle = '#ef4444';
+        dinoState.obstacles.forEach(obs => {
+          ctx.fillRect(obs.x, 210 - obs.h, obs.w, obs.h);
+        });
+
+        dinoLoopId = requestAnimationFrame(loop);
+      }
+      loop();
+
+      window.onkeydown = (e) => {
+        if (e.code === 'Space') {
+          e.preventDefault();
+          dinoJump();
+        }
+      };
+    }
+
+    function dinoJump() {
+      if (!dinoState.isJumping && !dinoState.gameOver) {
+        dinoState.vy = -14;
+        dinoState.isJumping = true;
+      }
+    }
+
+    // --- 页面8: 百科与自定义网页 (Wiki & Custom) ---
+    function renderWikiPage(container) {
+      container.innerHTML = `
+        <div class="max-w-4xl mx-auto p-6 fade-enter text-slate-800 dark:text-zinc-200">
+          <div class="flex items-center space-x-3 pb-4 mb-6 border-b border-slate-200 dark:border-zinc-800">
+            <i class="fa-solid fa-book-atlas text-blue-500 text-2xl"></i>
+            <div>
+              <h1 class="text-xl font-bold">星光百科 (Starlight Wiki)</h1>
+              <p class="text-xs text-slate-400">汇聚前沿科学、编程架构与人文知识的开放知识库</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="md:col-span-2 space-y-6 text-xs leading-relaxed">
+              <div class="bg-slate-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-slate-200 dark:border-zinc-700">
+                <h2 class="text-base font-bold text-teal-600 dark:text-teal-400 mb-2">🌐 现代 Web 浏览器的底层架构</h2>
+                <p class="mb-3">Web 浏览器是运行在操作系统之上的复杂多进程应用。现代主流浏览器（如 Chromium 体系）通常包含以下几大核心进程：</p>
+                <ul class="list-disc list-inside space-y-1 text-slate-600 dark:text-zinc-300">
+                  <li><strong>Browser 进程：</strong>负责主界面显示、标签页调度、网络资源下载与文件管理。</li>
+                  <li><strong>Renderer 渲染进程：</strong>负责将 HTML、CSS 和 JavaScript 转换为可交互的网页图像（每个标签页独立沙箱隔离）。</li>
+                  <li><strong>GPU 进程：</strong>负责 3D 绘制、Canvas 硬件加速以及全网页图层复合（Compositing）。</li>
+                </ul>
+              </div>
+
+              <div class="bg-slate-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-slate-200 dark:border-zinc-700">
+                <h2 class="text-base font-bold text-blue-600 dark:text-blue-400 mb-2">⚡ DOM 树与 CSSOM 的构建原理</h2>
+                <p>浏览器接收到网络传输的字节流（Bytes）后，首先经过词法分析器拆解为 Tokens，再由语法解析器构建为由 DOM 节点组成的层级树状结构。与此同时，CSS 样式表被解析为样式规则树（CSSOM）。两者合并生成渲染树（Render Tree），经历回流（Reflow）计算几何坐标与重绘（Repaint）最终输出到屏幕。</p>
+              </div>
+            </div>
+
+            <!-- 侧边栏推荐 -->
+            <div class="space-y-4">
+              <div class="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-2xl border border-slate-200 dark:border-zinc-700 text-xs">
+                <h3 class="font-bold text-slate-700 dark:text-zinc-200 mb-2">热门词条</h3>
+                <div class="space-y-2">
+                  <a onclick="navigateTo('spark://search?q=HTTP协议')" class="block text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">📌 HTTP/3 与 QUIC 协议</a>
+                  <a onclick="navigateTo('spark://search?q=V8引擎')" class="block text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">📌 JavaScript V8 编译原理</a>
+                  <a onclick="navigateTo('spark://search?q=TCP三次握手')" class="block text-teal-600 dark:text-teal-400 hover:underline cursor-pointer">📌 TCP 三次握手与四次挥手</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderCustomWebPage(container, url) {
+      container.innerHTML = `
+        <div class="max-w-2xl mx-auto py-16 px-4 text-center fade-enter">
+          <div class="w-16 h-16 rounded-2xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center mx-auto mb-4 text-2xl">
+            <i class="fa-solid fa-globe"></i>
+          </div>
+          <h2 class="text-lg font-bold text-slate-800 dark:text-zinc-100 mb-2">${url}</h2>
+          <p class="text-xs text-slate-500 mb-6 leading-relaxed">
+            您已成功通过星光极速浏览器访问外部虚拟网络地址。此页面已由内置轻量内核完成沙箱化渲染，通信协议与数据链路安全。
+          </p>
+          <div class="inline-flex space-x-3 text-xs">
+            <button onclick="navigateTo('spark://newtab')" class="px-4 py-2 rounded-xl bg-teal-500 text-white font-medium hover:bg-teal-600 transition shadow-md">
+              返回主页
+            </button>
+            <button onclick="toggleDevTools()" class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-zinc-800 text-slate-700 dark:text-zinc-300 font-medium hover:bg-slate-300 transition">
+              检查源代码
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- 页面9: 历史记录与书签管理 ---
+    function renderHistoryPage(container) {
+      container.innerHTML = `
+        <div class="max-w-3xl mx-auto p-6 fade-enter text-xs text-slate-800 dark:text-zinc-200">
+          <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 dark:border-zinc-800">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-clock-rotate-left text-slate-500 text-lg"></i>
+              <h1 class="text-base font-bold">浏览历史记录</h1>
+            </div>
+            <button onclick="clearHistory()" class="px-3 py-1.5 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 rounded-lg font-medium transition">
+              清除所有历史
+            </button>
+          </div>
+
+          <div class="space-y-3">
+            ${BrowserState.history.length > 0 ? BrowserState.history.map(item => `
+              <div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-700/60 hover:border-teal-500 transition">
+                <div class="flex items-center space-x-3 truncate">
+                  <span class="text-slate-400 font-mono text-[10px]">${item.time}</span>
+                  <span onclick="navigateTo('${item.url}')" class="font-medium hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer truncate">${item.title}</span>
+                  <span class="text-slate-400 font-mono text-[10px] truncate">${item.url}</span>
+                </div>
+              </div>
+            `).reverse().join('') : `
+              <div class="text-center py-12 text-slate-400">暂无浏览记录</div>
+            `}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderBookmarksPage(container) {
+      container.innerHTML = `
+        <div class="max-w-3xl mx-auto p-6 fade-enter text-xs text-slate-800 dark:text-zinc-200">
+          <div class="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 dark:border-zinc-800">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-star text-amber-500 text-lg"></i>
+              <h1 class="text-base font-bold">书签管理器</h1>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            ${BrowserState.bookmarks.map(bm => `
+              <div class="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 dark:bg-zinc-800/40 border border-slate-200 dark:border-zinc-700/60">
+                <div class="flex items-center space-x-3 truncate">
+                  <i class="fa-solid ${bm.icon} ${bm.color}"></i>
+                  <div class="truncate">
+                    <div onclick="navigateTo('${bm.url}')" class="font-medium hover:text-teal-600 dark:hover:text-teal-400 cursor-pointer truncate">${bm.title}</div>
+                    <div class="text-slate-400 font-mono text-[10px] truncate">${bm.url}</div>
+                  </div>
+                </div>
+                <button onclick="removeBookmark('${bm.id}')" title="删除书签" class="text-slate-400 hover:text-rose-500 p-1">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderSettingsPage(container) {
+      container.innerHTML = `
+        <div class="max-w-2xl mx-auto p-6 fade-enter text-xs text-slate-800 dark:text-zinc-200 space-y-6">
+          <div class="flex items-center space-x-2 pb-4 border-b border-slate-200 dark:border-zinc-800">
+            <i class="fa-solid fa-gear text-teal-500 text-lg"></i>
+            <h1 class="text-base font-bold">浏览器设置中心</h1>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
+            <h3 class="font-bold text-sm">外观与个性化</h3>
+            <div class="flex items-center justify-between">
+              <span>显示书签栏</span>
+              <input type="checkbox" ${BrowserState.showBookmarksBar ? 'checked' : ''} onchange="toggleBookmarksBar()" class="accent-teal-500 w-4 h-4">
+            </div>
+            <div class="flex items-center justify-between">
+              <span>深色主题模式</span>
+              <input type="checkbox" ${BrowserState.darkMode ? 'checked' : ''} onchange="toggleDarkMode()" class="accent-teal-500 w-4 h-4">
+            </div>
+          </div>
+
+          <div class="bg-slate-50 dark:bg-zinc-800/40 p-4 rounded-xl border border-slate-200 dark:border-zinc-700 space-y-3">
+            <h3 class="font-bold text-sm">隐私与安全</h3>
+            <div class="flex items-center justify-between">
+              <span>清理本地缓存与临时 Cookie</span>
+              <button onclick="alert('已成功清理浏览器虚拟运行缓存！')" class="px-3 py-1 bg-slate-200 dark:bg-zinc-700 rounded hover:bg-slate-300">立即清理</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 书签栏与历史记录管理
+    // ==========================================
+    function renderBookmarksBar() {
+      const bar = document.getElementById('bookmarks-bar');
+      bar.innerHTML = '';
+
+      BrowserState.bookmarks.forEach(bm => {
+        const item = document.createElement('div');
+        item.className = 'flex items-center space-x-1.5 px-2.5 py-1 rounded-md hover:bg-slate-200/70 dark:hover:bg-zinc-800 text-slate-700 dark:text-zinc-300 cursor-pointer transition text-xs whitespace-nowrap';
+        item.onclick = () => navigateTo(bm.url);
+        item.innerHTML = `
+          <i class="fa-solid ${bm.icon} text-[11px] ${bm.color}"></i>
+          <span>${bm.title}</span>
+        `;
+        bar.appendChild(item);
+      });
+    }
+
+    function toggleBookmarksBar() {
+      BrowserState.showBookmarksBar = !BrowserState.showBookmarksBar;
+      const bar = document.getElementById('bookmarks-bar');
+      bar.style.display = BrowserState.showBookmarksBar ? 'flex' : 'none';
+    }
+
+    function toggleBookmarkCurrent() {
+      const tab = getActiveTab();
+      if (!tab) return;
+
+      const idx = BrowserState.bookmarks.findIndex(b => b.url === tab.url);
+      if (idx !== -1) {
+        BrowserState.bookmarks.splice(idx, 1);
+      } else {
+        BrowserState.bookmarks.push({
+          id: 'bm_' + Date.now(),
+          title: tab.title,
+          url: tab.url,
+          icon: tab.icon,
+          color: 'text-teal-500'
+        });
+      }
+      renderBookmarksBar();
+      updateNavigationControls();
+    }
+
+    function removeBookmark(id) {
+      BrowserState.bookmarks = BrowserState.bookmarks.filter(b => b.id !== id);
+      renderBookmarksBar();
+      renderBookmarksPage(document.getElementById('webview-container'));
+    }
+
+    function recordHistory(url, title) {
+      if (url === 'spark://newtab') return;
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+      BrowserState.history.push({ url, title, time: timeStr });
+    }
+
+    function clearHistory() {
+      BrowserState.history = [];
+      renderHistoryPage(document.getElementById('webview-container'));
+    }
+
+    // ==========================================
+    // F12 开发者工具 (DevTools)
+    // ==========================================
+    function toggleDevTools() {
+      BrowserState.devToolsOpen = !BrowserState.devToolsOpen;
+      const panel = document.getElementById('devtools-panel');
+      const btn = document.getElementById('btn-devtools');
+
+      if (BrowserState.devToolsOpen) {
+        panel.classList.remove('hidden');
+        btn.classList.add('text-teal-500');
+        updateDevToolsView();
+      } else {
+        panel.classList.add('hidden');
+        btn.classList.remove('text-teal-500');
+      }
+    }
+
+    function switchDevTab(tabKey) {
+      BrowserState.currentDevTab = tabKey;
+      ['elements', 'console', 'network', 'sources'].forEach(t => {
+        const btn = document.getElementById(`devtab-btn-${t}`);
+        if (t === tabKey) {
+          btn.className = 'px-2.5 py-1 rounded bg-slate-800 text-teal-400 font-medium';
+        } else {
+          btn.className = 'px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-800';
+        }
+      });
+      document.getElementById('console-input-bar').style.display = (tabKey === 'console') ? 'flex' : 'none';
+      updateDevToolsView();
+    }
+
+    function updateDevToolsView() {
+      const content = document.getElementById('devtools-content');
+      const tab = getActiveTab();
+      const webview = document.getElementById('webview-container');
+
+      if (BrowserState.currentDevTab === 'elements') {
+        content.innerHTML = `
+          <div class="space-y-1 code-font text-xs">
+            <div class="text-slate-400">&lt;!DOCTYPE html&gt;</div>
+            <div class="text-blue-400">&lt;<span class="text-purple-400">html</span> lang="zh-CN"&gt;</div>
+            <div class="pl-4 text-blue-400">&lt;<span class="text-purple-400">head</span>&gt; ... &lt;/<span class="text-purple-400">head</span>&gt;</div>
+            <div class="pl-4 text-blue-400">&lt;<span class="text-purple-400">body</span> class="browser-body"&gt;</div>
+            <div class="pl-8 text-slate-300">
+              <div class="text-slate-500">// 当前页面 DOM 树结构实时呈现</div>
+              <div class="text-teal-400">&lt;<span class="text-purple-400">div</span> id="page-root"&gt;</div>
+              <div class="pl-4 text-slate-400">&lt;!-- URL: ${tab.url} --&gt;</div>
+              <div class="pl-4 text-slate-300">${escapeHtml(webview.innerHTML.slice(0, 500))} ...</div>
+              <div class="text-teal-400">&lt;/<span class="text-purple-400">div</span>&gt;</div>
+            </div>
+            <div class="pl-4 text-blue-400">&lt;/<span class="text-purple-400">body</span>&gt;</div>
+            <div class="text-blue-400">&lt;/<span class="text-purple-400">html</span>&gt;</div>
+          </div>
+        `;
+      } else if (BrowserState.currentDevTab === 'console') {
+        content.innerHTML = `
+          <div class="space-y-1.5 code-font text-xs" id="console-logs-list">
+            <div class="text-slate-500">[System] Spark JavaScript Engine v8.0.1 Ready.</div>
+            ${BrowserState.consoleLogs.map(l => `
+              <div class="${l.type === 'error' ? 'text-rose-400' : 'text-slate-200'} border-b border-slate-800 pb-1">
+                <span class="text-slate-500">[${l.time}]</span> ${l.text}
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (BrowserState.currentDevTab === 'network') {
+        content.innerHTML = `
+          <table class="w-full text-left text-[11px] code-font">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-800">
+                <th class="py-1">Name</th>
+                <th>Status</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${BrowserState.networkRequests.map(req => `
+                <tr class="border-b border-slate-850 hover:bg-slate-800">
+                  <td class="py-1 text-teal-400 truncate max-w-[120px]">${req.name}</td>
+                  <td class="text-emerald-400 font-bold">${req.status}</td>
+                  <td class="text-slate-400">${req.type}</td>
+                  <td class="text-slate-400">${req.size}</td>
+                  <td class="text-slate-400">${req.time}</td>
+                </tr>
+              `).reverse().join('')}
+            </tbody>
+          </table>
+        `;
+      } else if (BrowserState.currentDevTab === 'sources') {
+        content.innerHTML = `
+          <div class="code-font text-xs text-slate-300">
+            <div class="text-slate-500 mb-2">// 源代码预览: ${tab.url}</div>
+            <pre class="bg-slate-950 p-3 rounded-lg overflow-x-auto text-[11px]">${escapeHtml(webview.innerHTML)}</pre>
+          </div>
+        `;
+      }
+    }
+
+    function executeConsoleCode(code) {
+      if (!code.trim()) return;
+      document.getElementById('console-input').value = '';
+      const now = new Date().toLocaleTimeString();
+
+      try {
+        const result = eval(code);
+        BrowserState.consoleLogs.push({ type: 'log', text: `> ${code}\n< ${result}`, time: now });
+      } catch (err) {
+        BrowserState.consoleLogs.push({ type: 'error', text: `> ${code}\nError: ${err.message}`, time: now });
+      }
+      updateDevToolsView();
+    }
+
+    function recordNetworkRequest(url) {
+      const now = new Date().toLocaleTimeString();
+      BrowserState.networkRequests.push({
+        name: url.split('/').pop() || url,
+        status: '200 OK',
+        type: url.endsWith('.js') ? 'script' : (url.endsWith('.css') ? 'stylesheet' : 'document'),
+        size: (Math.random()*15 + 2).toFixed(1) + ' KB',
+        time: (Math.random()*40 + 10).toFixed(0) + ' ms'
+      });
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ==========================================
+    // 菜单与辅助弹窗控制
+    // ==========================================
+    function toggleMenu() {
+      const menu = document.getElementById('main-menu');
+      menu.classList.toggle('hidden');
+    }
+    function closeMenu() {
+      document.getElementById('main-menu').classList.add('hidden');
+    }
+    function toggleDarkMode() {
+      BrowserState.darkMode = !BrowserState.darkMode;
+      const html = document.documentElement;
+      const icon = document.getElementById('theme-icon');
+      if (BrowserState.darkMode) {
+        html.classList.add('dark');
+        icon.className = 'fa-solid fa-sun text-amber-400';
+      } else {
+        html.classList.remove('dark');
+        icon.className = 'fa-solid fa-moon text-slate-600';
+      }
+    }
+    function togglePrincipleModal() {
+      document.getElementById('principle-modal').classList.toggle('hidden');
+    }
+    function showAboutModal() {
+      alert('星光极速浏览器 (Spark Browser) v2.5\n面向信息技术教学与现代网络探究的单文件全功能模拟浏览器。');
+    }
+    function showSecurityInfo() {
+      alert('🔒 安全连接 (HTTPS)\n证书有效，您与本虚拟网页之间的通信采用现代端到端传输加密。');
+    }
+    function simulateWindowAction(action) {
+      if (action === 'close') {
+        alert('在真实的操作系统中，这将关闭浏览器主窗口。');
+      } else if (action === 'maximize') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        } else {
+          document.exitFullscreen().catch(() => {});
+        }
+      }
+    }
+
+    // ==========================================
+    // 应用初始化启动
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      renderBookmarksBar();
+      createNewTab('spark://newtab', '新标签页');
+    });
+
+    // 点击页面其他区域关闭下拉菜单
+    window.addEventListener('click', (e) => {
+      const menu = document.getElementById('main-menu');
+      if (!menu.contains(e.target) && !e.target.closest('button[onclick="toggleMenu()"]')) {
+        menu.classList.add('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

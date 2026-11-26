@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>安卓平板 WebView 环境检测</title>
+<style>
+/* All resources are embedded. No CDN, fonts, or external scripts. */
+* { box-sizing:border-box; }
+html { background:#edf2f5; color:#172b3a; font-family:Arial,"Microsoft YaHei",sans-serif; font-size:16px; }
+body { margin:0; padding:14px; }
+.wrap { max-width:900px; margin:0 auto; }
+.head { background:#15394a; color:#fff; border-radius:12px; padding:20px; margin-bottom:12px; }
+h1 { font-size:24px; margin:0 0 8px; line-height:1.35; } h2 { font-size:19px; margin:0 0 12px; }
+p { margin:8px 0; line-height:1.6; } .sub { color:#e0eff2; font-size:14px; }
+.panel { background:#fff; border:1px solid #cbd7de; border-radius:10px; padding:16px; margin-bottom:12px; }
+.note { color:#4c6170; font-size:14px; } .ok { color:#146843; } .bad { color:#a32b2b; } .warn { color:#855300; }
+button,a.action,select { font:inherit; font-size:15px; min-height:44px; border:1px solid #9caeb8; border-radius:6px; padding:10px 12px; margin:4px 4px 4px 0; vertical-align:middle; }
+button,a.action { display:inline-block; background:#14685e; color:#fff; text-decoration:none; cursor:pointer; } button.secondary,a.secondary { background:#eef3f6; color:#173949; } select { max-width:100%; background:#fff; color:#172b3a; }
+.status { border:1px solid #cbd7de; border-radius:6px; padding:10px; margin:8px 0; background:#f5f8fa; line-height:1.6; word-wrap:break-word; }
+table { border-collapse:collapse; width:100%; table-layout:fixed; font-size:14px; } th,td { border-bottom:1px solid #dce4e8; padding:8px 5px; text-align:left; vertical-align:top; word-wrap:break-word; } th { color:#4c6170; } th:first-child { width:34%; }
+.swatch { display:inline-block; width:27%; min-width:56px; text-align:center; padding:9px 2px; margin:2px; color:#fff; border-radius:5px; } .s1{background:#14685e;} .s2{background:#285d9d;} .s3{background:#935321;}
+#hiddenTest { display:none; } #flexTest { display:flex; display:-webkit-flex; display:flex; width:120px; height:24px; border:1px solid #8ca0ab; } #flexTest span { display:block; width:50px; height:18px; background:#14685e; margin:2px; }
+#frameArea { border:1px solid #9caeb8; border-radius:6px; background:#f3f6f8; margin-top:10px; min-height:100px; }
+#frameArea iframe { width:100%; height:420px; display:block; border:0; background:#fff; }
+textarea { display:block; width:100%; min-height:190px; padding:9px; font:13px monospace; color:#172b3a; background:#f7fafb; border:1px solid #9caeb8; border-radius:6px; }
+#ua { font:13px monospace; word-wrap:break-word; white-space:pre-wrap; }
+@media (max-width:480px) { body { padding:8px; } .head,.panel { padding:12px; } h1 {font-size:21px;} #frameArea iframe {height:350px;} }
+</style>
+</head>
+<body><div class="wrap">
+<div class="head"><h1>安卓平板 WebView 环境检测</h1><p class="sub">单文件 · 零外部界面资源 · 无需登录 · 仅在本机生成报告</p></div>
+<div class="panel"><h2>01 / 基础渲染</h2><p>正常情况下，下方应为绿色、蓝色、棕色三个色块，且没有文字重叠。</p><div><span class="swatch s1">绿色</span><span class="swatch s2">蓝色</span><span class="swatch s3">棕色</span></div><p id="hiddenTest">如果你能看到这一行，CSS 的隐藏规则没有生效。</p><div id="flexTest"><span></span><span></span></div><p class="note">上方两个小绿块正常应横向排列。这个文件不依赖外部 CSS 或图标字体。</p><div id="jsStatus" class="status bad">JavaScript 尚未执行。如果一直显示这句话，可能是预览器禁用了脚本。</div><button id="tapBtn" type="button">触屏交互测试</button><span id="tapResult">点击次数：0</span><noscript><p class="bad">当前环境禁用了 JavaScript。</p></noscript></div>
+<div class="panel"><h2>02 / 内核与功能</h2><p class="note">User-Agent 只是环境线索，不保证能准确识别厂商或内核。</p><div id="ua" class="status">等待 JavaScript 检测。</div><table><thead><tr><th>检测项</th><th>结果</th></tr></thead><tbody id="results"><tr><td colspan="2">等待检测</td></tr></tbody></table><button type="button" class="secondary" id="refreshBtn">重新检测</button></div>
+<div class="panel"><h2>03 / 内嵌网页基础测试</h2><p class="note">先验证 iframe 能否显示本文件生成的本地测试页，再测试学校已允许访问的网站。</p><button id="localBtn" type="button">加载本地测试页</button><div id="localStatus" class="status">尚未测试。</div><div id="localArea"></div></div>
+<div class="panel"><h2>04 / 已授权网站访问测试</h2><p>请在学校允许使用的网络环境中，选择已获准访问的官网。测试不会更改网络、代理或设备管理设置。</p><label for="site">目标网站：</label><select id="site"><option value="https://www.moe.gov.cn/">教育部官网</option><option value="https://www.iflytek.com/">科大讯飞官网</option></select><div><button id="embedBtn" type="button">在框内加载</button><button class="secondary" id="clearBtn" type="button">停止 / 清空</button></div><div id="netStatus" class="status">尚未发起请求。</div><div id="frameArea"><p style="padding:10px" class="note">网页预览区域</p></div><p class="note">注意：跨域 iframe 的 load 事件不能证明目标页面真的打开。请以实际可见内容为准。空白、报错或拒绝连接可能来自网站禁止嵌入、设备策略或网络问题。</p><label for="observation">实际观察：</label><select id="observation"><option value="未记录">未记录</option><option value="看到真实网页">看到真实网页</option><option value="空白或一直加载">空白或一直加载</option><option value="拒绝连接或报错">拒绝连接或报错</option><option value="显示设备管控提示">显示设备管控提示</option></select><p class="note">如内嵌失败，可用普通链接验证网站本身是否能打开。返回本页可能需要设备的返回键。</p><a class="action secondary" href="https://www.moe.gov.cn/" target="_self">直接打开教育部</a><a class="action secondary" href="https://www.iflytek.com/" target="_self">直接打开科大讯飞</a></div>
+<div class="panel"><h2>05 / 检测报告</h2><p class="note">可截图，或复制文本。报告不会自动发送；分享前可删除不想公开的环境信息。</p><button type="button" id="reportBtn">更新报告</button><button type="button" class="secondary" id="copyBtn">选中报告</button><textarea id="report" readonly="readonly">等待 JavaScript 执行。</textarea></div>
+</div>
+<script>
+(function(){
+  function el(id){return document.getElementById(id);}
+  function setText(node, value){if(typeof node.textContent !== 'undefined'){node.textContent=value;}else{node.innerText=value;}}
+  function status(id,msg,cls){var n=el(id);setText(n,msg);n.className='status '+(cls||'');}
+  var results=[], clicks=0, localResult='未测试', netResult='未测试', testedUrl='', activeFrame=null, netTimer=null;
+  function report(){var lines=['安卓平板 WebView 检测','User-Agent: '+navigator.userAgent,'时间: '+new Date().toLocaleString()]; for(var i=0;i<results.length;i++){lines.push(results[i][0]+': '+results[i][1]);}lines.push('触屏按钮点击: '+clicks,'本地 iframe: '+localResult,'目标网站: '+(testedUrl||'未测试'),'外部 iframe 事件: '+netResult,'人工观察: '+el('observation').value);el('report').value=lines.join('\n');}
+  function add(name,value){results.push([name,value]);var tr=document.createElement('tr'),a=document.createElement('td'),b=document.createElement('td');setText(a,name);setText(b,value);tr.appendChild(a);tr.appendChild(b);el('results').appendChild(tr);}
+  function check(fn){try{return fn();}catch(e){return '不可用 / '+(e.message||e);}}
+  function run(){results=[];el('results').innerHTML='';setText(el('ua'),navigator.userAgent);add('JavaScript','已执行');add('页面协议',location.protocol);add('窗口尺寸',(window.innerWidth||document.documentElement.clientWidth)+' × '+(window.innerHeight||document.documentElement.clientHeight));add('屏幕尺寸',screen.width+' × '+screen.height+'；DPR '+(window.devicePixelRatio||1));add('CSS 隐藏规则',check(function(){return window.getComputedStyle(el('hiddenTest'),null).display==='none'?'正常':'异常';}));add('Flex 布局',check(function(){var c=el('flexTest').getElementsByTagName('span');return Math.abs(c[0].offsetTop-c[1].offsetTop)<3&&c[1].offsetLeft>c[0].offsetLeft?'正常':'未通过视觉布局检测';}));add('触屏支持',('ontouchstart' in window || navigator.maxTouchPoints>0)?'检测到触屏接口':'未检测到');add('LocalStorage',check(function(){var k='pad_diag_'+new Date().getTime();try{localStorage.setItem(k,'ok');return localStorage.getItem(k)==='ok'?'读写成功':'读写异常';}finally{localStorage.removeItem(k);}}));add('Canvas 2D',check(function(){var c=document.createElement('canvas');return c.getContext&&c.getContext('2d')?'可用':'不可用';}));add('WebGL',check(function(){var c=document.createElement('canvas');return c.getContext&&(c.getContext('webgl')||c.getContext('experimental-webgl'))?'可用':'不可用';}));add('iframe srcdoc',('srcdoc' in document.createElement('iframe'))?'接口存在（需实际测试）':'未检测到');add('网络状态提示',typeof navigator.onLine==='boolean'?(navigator.onLine?'设备报告在线（不代表可访问任意网站）':'设备报告离线'):'未提供');report();}
+  status('jsStatus','JavaScript 已成功执行。','ok');
+  el('tapBtn').onclick=function(){clicks++;setText(el('tapResult'),'点击次数：'+clicks);report();};
+  el('refreshBtn').onclick=run;
+  el('localBtn').onclick=function(){var a=el('localArea');a.innerHTML='';var f=document.createElement('iframe');f.title='本地测试';f.style.cssText='width:100%;height:100px;border:1px solid #9caeb8;background:white;';if(!('srcdoc' in f)){localResult='srcdoc 接口不支持';status('localStatus',localResult,'warn');report();return;}localResult='已创建，等待验证';status('localStatus',localResult);f.onload=function(){try{var d=f.contentDocument;if(d&&d.getElementById('localMarker')){localResult='成功：读取到本地测试标记';status('localStatus',localResult,'ok');}else{localResult='未读取到标记，请目视确认';status('localStatus',localResult,'warn');}}catch(e){localResult='无法读取内容，请目视确认';status('localStatus',localResult,'warn');}report();};f.srcdoc='<!doctype html><html><body style="margin:10px;font:16px Arial;color:#146843"><strong id="localMarker">本地 iframe 渲染成功</strong><p>这不是联网网页。</p></body></html>';a.appendChild(f);report();};
+  function clearFrame(){if(netTimer){clearTimeout(netTimer);netTimer=null;}if(activeFrame){activeFrame.onload=null;activeFrame.onerror=null;activeFrame=null;}el('frameArea').innerHTML='';}
+  el('embedBtn').onclick=function(){clearFrame();testedUrl=el('site').value;el('observation').selectedIndex=0;netResult='已发起，等待事件';status('netStatus',netResult+'：'+testedUrl);var f=document.createElement('iframe');activeFrame=f;f.title='已授权网站预览';f.setAttribute('referrerpolicy','no-referrer');f.onload=function(){if(activeFrame!==f){return;}if(netTimer){clearTimeout(netTimer);netTimer=null;}netResult='收到 load 事件，需目视确认';status('netStatus',netResult,'warn');report();};f.onerror=function(){if(activeFrame!==f){return;}netResult='收到 error 事件';status('netStatus',netResult,'warn');report();};f.src=testedUrl;el('frameArea').appendChild(f);netTimer=setTimeout(function(){if(activeFrame===f){netResult='15 秒内未收到 load 事件（不是最终结论）';status('netStatus',netResult,'warn');report();}},15000);report();};
+  el('clearBtn').onclick=function(){clearFrame();netResult='已停止 / 清空';status('netStatus',netResult);report();};
+  el('observation').onchange=report;el('reportBtn').onclick=report;el('copyBtn').onclick=function(){report();el('report').focus();el('report').select();try{el('report').setSelectionRange(0,el('report').value.length);}catch(e){}};
+  run();
+})();
+</script>
+</body></html>
