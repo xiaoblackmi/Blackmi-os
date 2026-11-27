@@ -68,7 +68,8 @@ sequenceDiagram
     B->>B: 导入邀请，生成应答
     B-->>A: 应答二维码 / 完整连接码
     A->>A: 导入应答，建立连接
-    A<<->>B: WebRTC DataChannel 双向通信
+    A->>B: WebRTC DataChannel 消息
+    B->>A: WebRTC DataChannel 回复
     Note over A,B: 成功后即可发送消息或同步游戏状态
 ```
 
