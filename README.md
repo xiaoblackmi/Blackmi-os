@@ -1,18 +1,18 @@
 <div align="center">
 
-<img src="docs/assets/blackmi-refined.svg" alt="Blackmi OS 3.1.1 超宽屏桌面设计示意" width="100%">
+<img src="docs/assets/screenshots/Blackmi_3.1.2_desktop.jpg" alt="Blackmi OS 3.1.2 在 834×360 Chromium 视口中的运行截图" width="100%">
 
 # Blackmi OS
 
 **一个 HTML 文件，一张局域网，一个属于自己的多人应用空间。**
 
-![Version](https://img.shields.io/badge/Version-3.1.1%20Refined-3478ED?style=flat-square)
-![HTML](https://img.shields.io/badge/Single%20HTML-496%20KiB-526B91?style=flat-square)
+![Version](https://img.shields.io/badge/Version-3.1.2%20Notice%20Safe-3478ED?style=flat-square)
+![HTML](https://img.shields.io/badge/Single%20HTML-497%20KiB-526B91?style=flat-square)
 ![Games](https://img.shields.io/badge/Games-10-269579?style=flat-square)
 ![Players](https://img.shields.io/badge/Lobby-Up%20to%208-8066B5?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Development-E0A34C?style=flat-square)
 
-### [⬇️ 下载最新版](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V3.1.1_ViewportFit.html) · [📖 查看源码](client/Blackmi_OS_V3.1.1_ViewportFit.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
+### [⬇️ 下载最新版](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V3.1.2_NoticeSafe.html) · [📖 查看源码](client/Blackmi_OS_V3.1.2_NoticeSafe.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
 
 *Local-first communication, applications and multiplayer games.*
 
@@ -20,17 +20,37 @@
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
 >
-> 当前 V3.1.1 Refined · Viewport Fit 为开发版，优先适配 834×360 超宽屏 WebView。上图为原创界面示意，并非实机截图。
+> 当前 V3.1.2 Refined · Notice Safe 为开发版，优先适配 834×360 超宽屏 WebView。上图为实际运行 HTML 的 Chromium 截图，不是设计效果图，也不是 C6 实机联机验收。
 
 ---
 
-## 🆕 V3.1.1 · Refined / Viewport Fit
+## 🆕 V3.1.2 · Refined / Notice Safe
 
 | 桌面 | 应用与游戏 | 兼容性 |
 | :--- | :--- | :--- |
-| macOS 风格悬浮 Dock、渐变图标、时间与连接组件、浅深色主题 | Launchpad 中英文搜索、10 款游戏、开局前选择参赛座位或观战 | 25px 紧凑菜单栏、6px Dock 底部间距、壁纸等比覆盖；优先 834×360 |
+| macOS 风格悬浮 Dock、渐变图标、时间与连接组件、浅深色主题 | Launchpad 中英文搜索、10 款游戏、开局前选择参赛座位或观战 | 25px 紧凑菜单栏、36px 小屏 Dock 底部间距、壁纸等比覆盖；为宿主 AI 提示保留可见空间 |
 
-本次 3.1.1 是 3.1 的视口适配补丁，不改变其 JavaScript 脚本；3.1 的通信与游戏核心沿用 3.0。浏览器模拟已覆盖 834×360、960×600、834×540；目标旧版 Chromium 80 实机多人联机与性能仍待验收。
+3.1.2 在 3.1.1 上仅追加 CSS 安全区并更新 HTML 标题，所有脚本逐字节一致。宿主显示的 AI 提示不属于网页 DOM，保持其可见与原样显示，不删除、遮挡或伪造来源标识。小屏 Dock 底部间距为 36px，其他视口为 40px；最大化窗口同步预留空间，键盘布局保留原处理。
+
+## 📸 界面实录 / Screenshots
+
+以下图片均来自实际运行界面。明确区分用户客户端截图与开发机浏览器运行截图；未将其作为 C6 多人联机验收。
+
+### 应用中心与游戏中心
+
+| Launchpad 应用中心 | Game Center 游戏中心 |
+| :---: | :---: |
+| <img src="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg" alt="应用中心实际运行" width="100%"> | <img src="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg" alt="游戏中心实际运行" width="100%"> |
+| 834×360 Chromium · 应用网格与搜索 | 834×360 Chromium · 游戏入口 |
+
+### 客户端 AI 提示与底部安全区
+
+| V3.1.1 用户客户端预览（原问题） | V3.1.2 浏览器模拟提示（修正效果） |
+| :---: | :---: |
+| <img src="docs/assets/screenshots/Blackmi_client_preview.jpg" alt="用户提供的客户端截图，提示与 Dock 重叠" width="100%"> | <img src="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg" alt="浏览器模拟宿主提示，Dock 上移留出空间" width="100%"> |
+| 仅裁剪外部预览界面，原 AI 提示保留 | 834×360，测试用提示仅模拟位置，不属于发布 HTML |
+
+> 目标 PAD 的真实宿主提示高度、字体和位置可能因客户端版本变化。3.1.2 尚待在 Android 9 / Chromium 80 实机复测。
 
 ## ✨ 你可以做什么？
 
@@ -48,7 +68,7 @@
 
 ### 01｜下载并打开
 
-1. 点击上面的 **下载最新版**，保存为 `Blackmi_OS_V3.1.1_ViewportFit.html`。如果浏览器只显示源码，使用浏览器的保存文件功能。
+1. 点击上面的 **下载最新版**，保存为 `Blackmi_OS_V3.1.2_NoticeSafe.html`。如果浏览器只显示源码，使用浏览器的保存文件功能。
 2. 在支持 WebRTC 的浏览器或管理方允许的 WebView 中打开该 HTML。文件预览器不一定执行 JavaScript。
 3. 看到 Blackmi OS 桌面后，点击「消息」或「游戏中心」。
 
@@ -233,12 +253,12 @@ flowchart TD
 
 | 项目 | 当前信息 |
 | :--- | :--- |
-| 最新构建 | V3.1.1 Refined · Viewport Fit |
+| 最新构建 | V3.1.2 Refined · Notice Safe |
 | 日期 | 2026-11-27 |
-| 文件大小 | 508,180 bytes（约 496 KiB） |
+| 文件大小 | 509,138 bytes（约 497 KiB） |
 | 技术栈 | HTML / CSS / JavaScript / Canvas / WebRTC |
 | 适配目标 | 历史 C6 / Android 9 / Chromium 80 WebView；834×360、960×600 横屏 |
-| 发布状态 | 开发版，V3.1.1 目标 PAD 实机多人联机待验收 |
+| 发布状态 | 开发版，V3.1.2 目标 PAD 实机多人联机待验收 |
 
 | 测试项目 | 状态 |
 | :--- | :--- |
@@ -251,6 +271,8 @@ flowchart TD
 | V2.9 C6 多人联机 | ⏳ 待实机验收 |
 | V3.1.1 视口适配 | 🧪 开发记录：三种视口模拟、应用中心启动正常，非旧版 WebView 实机测试 |
 | V3.1.1 通信与游戏 | ⏳ 继承原核心，目标 PAD 实机回归待验收 |
+| V3.1.2 安全区 | 🧪 834×360 Chromium 实运行：桌面、Launchpad、游戏中心可打开；模拟提示不遮挡 Dock |
+| V3.1.2 脚本与来源标识 | ✅ 所有脚本与 3.1.1 逐字节一致，原 AI 来源元数据保留 |
 | ESP32 常驻 Core、AI | 📝 规划阶段，未实现或验收 |
 
 <details>
@@ -269,19 +291,20 @@ flowchart TD
 | V3.0 | Lite 桌面、参赛座位选择、坦克大战 |
 | V3.1 | Refined 视觉重构、Launchpad 搜索 |
 | V3.1.1 | Viewport Fit：超宽屏、壁纸覆盖与紧凑布局 |
+| V3.1.2 | Notice Safe：宿主提示安全区与截图文档 |
 
-版本演进不代表所有中间构建均已归档至 GitHub。历史 [V2.9 CoverFix](client/Blackmi_OS_V2.9_CoverFix.html) 仍可下载。
+版本演进不代表所有中间构建均已归档至 GitHub。历史 [V2.9 CoverFix](client/Blackmi_OS_V2.9_CoverFix.html) 仍可下载。[V3.1.1 Viewport Fit](client/Blackmi_OS_V3.1.1_ViewportFit.html) 也保留。
 
-SHA-256（V3.1.1，原始文件校验）：
+SHA-256（V3.1.2，原始文件校验）：
 
 ```text
-6416ffd5060199f62a33496be6fc0ddd82e9ec89125ca6df7f90e391bd8861f6
+9f5e9e857fb7b6282e469ddb573f256836f5413813f5111171ccba3ece2fff36
 ```
 
 Git Blob SHA：
 
 ```text
-14569370d77d593406317f546bb179a3cdfc5820
+427c79f42be77e7928a4f14d27248ac0526e6231
 ```
 
 </details>
@@ -293,7 +316,7 @@ client/      已归档客户端与最新版 HTML
 archive/     历史原型与实验
 labs/        能力与通信测试工具
 docs/        设计、历史、设备测试与安全文档
-  assets/    README 插图
+  assets/    README 插图及运行截图
 tests/       历史测试数据
 ```
 
