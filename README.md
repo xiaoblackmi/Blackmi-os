@@ -16,6 +16,8 @@
 
 <img src="docs/assets/screenshots/Blackmi_3.1.2_desktop.jpg" alt="Blackmi OS 3.1.2 在 834×360 Chromium 视口中的运行截图" width="100%">
 
+*V3.1.2 Refined · Notice Safe | 834 × 360 Chromium*
+
 </div>
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
@@ -23,6 +25,10 @@
 > 当前 V3.1.2 Refined · Notice Safe 为开发版，优先适配 834×360 超宽屏 WebView。上图为实际运行 HTML 的 Chromium 截图，不是设计效果图，也不是 C6 实机联机验收。
 
 ---
+
+## 🧭 快速导航
+
+[界面展示](#-界面实录--screenshots) · [功能介绍](#-你可以做什么) · [快速上手](#-快速上手) · [游戏图鉴](#-游戏图鉴) · [技术架构](#-技术架构) · [版本与验收](#-版本与验收)
 
 ## 🆕 V3.1.2 · Refined / Notice Safe
 
@@ -34,23 +40,34 @@
 
 ## 📸 界面实录 / Screenshots
 
-以下图片均来自实际运行界面。明确区分用户客户端截图与开发机浏览器运行截图；未将其作为 C6 多人联机验收。
+**一个桌面，多个应用。** 以下展示来自 V3.1.2 开发机 Chromium 实际运行及历史客户端预览，不是设计效果图。
 
-### 01｜应用中心与游戏中心
-
-| Launchpad 应用中心 | Game Center 游戏中心 |
+| Launchpad · 应用中心 | Game Center · 游戏中心 |
 | :---: | :---: |
-| <img src="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg" alt="应用中心实际运行" width="100%"> | <img src="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg" alt="游戏中心实际运行" width="100%"> |
-| 834×360 Chromium · 应用网格与搜索 | 834×360 Chromium · 游戏入口 |
+| <a href="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg" alt="应用中心实际运行" width="100%"></a> | <a href="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg" alt="游戏中心实际运行" width="100%"></a> |
+| 应用网格 · 中英文搜索 | 10 款游戏 · 联机大厅 |
 
-### 02｜客户端 AI 提示与底部安全区
+<div align="center">
 
-| V3.1.1 用户客户端预览（原问题） | V3.1.2 浏览器模拟提示（修正效果） |
+<a href="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg" alt="V3.1.2 浏览器模拟宿主提示，Dock 上移并保留安全区" width="85%"></a>
+
+*Notice Safe · 底部安全区（834×360 Chromium 模拟宿主提示）*
+
+</div>
+
+> 2026-11-27 用户客户端预览中，桌面、应用中心、消息与游戏中心均可打开，宿主 AI 提示位于 Dock 下方。消息截图仅显示单人成员，不能作为跨设备联机验收。目标 Android 9 / Chromium 80 PAD 仍待实机复测。
+
+<details>
+<summary><b>查看历史客户端预览与安全区对比</b></summary>
+
+| V3.1.1 用户客户端预览 | V3.1.2 开发机模拟提示 |
 | :---: | :---: |
-| <img src="docs/assets/screenshots/Blackmi_client_preview.jpg" alt="用户提供的客户端截图，提示与 Dock 重叠" width="100%"> | <img src="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg" alt="浏览器模拟宿主提示，Dock 上移留出空间" width="100%"> |
-| 仅裁剪外部预览界面，原 AI 提示保留 | 834×360，测试用提示仅模拟位置，不属于发布 HTML |
+| <img src="docs/assets/screenshots/Blackmi_client_preview.jpg" alt="历史客户端截图，提示与 Dock 重叠" width="100%"> | <img src="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg" alt="开发机模拟提示，Dock 上移" width="100%"> |
+| 原 AI 提示保留，仅裁剪外部预览 | 模拟提示仅用于测试，不属于发布 HTML |
 
-> 2026-11-27 的 V3.1.2 用户客户端预览另观察到桌面、应用中心、消息和游戏中心可打开，宿主 AI 提示位于 Dock 下方；消息截图仅显示单人成员，不代表跨设备通信成功。目标 PAD 的真实宿主提示高度、字体和位置可能因客户端版本变化。3.1.2 尚待在 Android 9 / Chromium 80 实机复测。
+真实宿主提示的位置、字体与高度可能随客户端版本变化。
+
+</details>
 
 ## ✨ 你可以做什么？
 
