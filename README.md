@@ -14,15 +14,15 @@
 
 *Local-first communication, applications and multiplayer games.*
 
-<img src="docs/assets/screenshots/Blackmi_3.1.2_desktop.jpg" alt="Blackmi OS 3.1.2 在 834×360 Chromium 视口中的运行截图" width="100%">
+<a href="docs/assets/screenshots/Blackmi_3.1.2_client_desktop.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_client_desktop.jpg" alt="Blackmi OS V3.1.2 用户客户端桌面预览，保留 AI 来源提示" width="90%"></a>
 
-*V3.1.2 Refined · Notice Safe | 834 × 360 Chromium*
+*V3.1.2 Refined · Notice Safe | 2026-11-27 客户端预览*
 
 </div>
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
 >
-> 当前 V3.1.2 Refined · Notice Safe 为开发版，优先适配 834×360 超宽屏 WebView。上图为实际运行 HTML 的 Chromium 截图，不是设计效果图，也不是 C6 实机联机验收。
+> 当前 V3.1.2 Refined · Notice Safe 为开发版，优先适配 834×360 超宽屏 WebView。上图为用户提供的实际客户端预览截图，不是设计效果图，也不是 C6 实机联机验收。
 
 ---
 
@@ -40,25 +40,33 @@
 
 ## 📸 界面实录 / Screenshots
 
-**一个桌面，多个应用。** 以下展示来自 V3.1.2 开发机 Chromium 实际运行及历史客户端预览，不是设计效果图。
+**一个桌面，多个应用。** 以下四张截图来自 2026-11-27 用户客户端预览，仅裁剪外部预览页面边缘，保留界面内容及宿主 AI 来源提示。点击图片可查看原图。
 
-| Launchpad · 应用中心 | Game Center · 游戏中心 |
+| Desktop · 桌面 | Launchpad · 应用中心 |
 | :---: | :---: |
-| <a href="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg" alt="应用中心实际运行" width="100%"></a> | <a href="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg" alt="游戏中心实际运行" width="100%"></a> |
-| 应用网格 · 中英文搜索 | 10 款游戏 · 联机大厅 |
+| <a href="docs/assets/screenshots/Blackmi_3.1.2_client_desktop.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_client_desktop.jpg" alt="桌面、时间组件与悬浮 Dock" width="100%"></a> | <a href="docs/assets/screenshots/Blackmi_3.1.2_client_launchpad.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_client_launchpad.jpg" alt="应用中心与搜索" width="100%"></a> |
+| 时间组件 · 悬浮 Dock · 局域网状态 | 应用网格 · 中英文搜索 |
 
-<div align="center">
+| Messages · 即时通信 | Game Center · 游戏中心 |
+| :---: | :---: |
+| <a href="docs/assets/screenshots/Blackmi_3.1.2_client_messages.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_client_messages.jpg" alt="公共聊天室与联系人" width="100%"></a> | <a href="docs/assets/screenshots/Blackmi_3.1.2_client_game-center.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_client_game-center.jpg" alt="游戏大厅与游戏入口" width="100%"></a> |
+| 公共聊天室 · 联系人 · 消息输入 | 10 款游戏 · 联机大厅 |
 
-<a href="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg"><img src="docs/assets/screenshots/Blackmi_3.1.2_notice_preview.jpg" alt="V3.1.2 浏览器模拟宿主提示，Dock 上移并保留安全区" width="85%"></a>
-
-*Notice Safe · 底部安全区（834×360 Chromium 模拟宿主提示）*
-
-</div>
-
-> 2026-11-27 用户客户端预览中，桌面、应用中心、消息与游戏中心均可打开，宿主 AI 提示位于 Dock 下方。消息截图仅显示单人成员，不能作为跨设备联机验收。目标 Android 9 / Chromium 80 PAD 仍待实机复测。
+> 客户端预览中，桌面、应用中心、消息与游戏中心均可打开，宿主 AI 提示位于 Dock 下方。消息截图仅显示单人成员，不能作为跨设备联机验收。目标 Android 9 / Chromium 80 PAD 仍待实机复测。
 
 <details>
-<summary><b>查看历史客户端预览与安全区对比</b></summary>
+<summary><b>查看开发机运行截图（834×360 Chromium）</b></summary>
+
+<img src="docs/assets/screenshots/Blackmi_3.1.2_desktop.jpg" alt="开发机桌面运行截图" width="100%">
+
+| Launchpad | Game Center |
+| :---: | :---: |
+| <img src="docs/assets/screenshots/Blackmi_3.1.2_launchpad.jpg" alt="开发机应用中心" width="100%"> | <img src="docs/assets/screenshots/Blackmi_3.1.2_game-center.jpg" alt="开发机游戏中心" width="100%"> |
+
+</details>
+
+<details>
+<summary><b>查看历史客户端预览与底部安全区对比</b></summary>
 
 | V3.1.1 用户客户端预览 | V3.1.2 开发机模拟提示 |
 | :---: | :---: |
