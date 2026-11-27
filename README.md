@@ -1,18 +1,18 @@
 <div align="center">
 
-<img src="docs/assets/blackmi-hero.svg" alt="Blackmi OS V2.9 desktop and game center illustration" width="100%">
+<img src="docs/assets/blackmi-refined.svg" alt="Blackmi OS 3.1.1 超宽屏桌面设计示意" width="100%">
 
 # Blackmi OS
 
 **一个 HTML 文件，一张局域网，一个属于自己的多人应用空间。**
 
-![Version](https://img.shields.io/badge/Version-2.9%20Party-3478ED?style=flat-square)
-![HTML](https://img.shields.io/badge/Single%20HTML-425%20KiB-526B91?style=flat-square)
-![Games](https://img.shields.io/badge/Games-9-269579?style=flat-square)
+![Version](https://img.shields.io/badge/Version-3.1.1%20Refined-3478ED?style=flat-square)
+![HTML](https://img.shields.io/badge/Single%20HTML-496%20KiB-526B91?style=flat-square)
+![Games](https://img.shields.io/badge/Games-10-269579?style=flat-square)
 ![Players](https://img.shields.io/badge/Lobby-Up%20to%208-8066B5?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Development-E0A34C?style=flat-square)
 
-### [⬇️ 下载最新版](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V2.9_CoverFix.html) · [📖 查看源码](client/Blackmi_OS_V2.9_CoverFix.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
+### [⬇️ 下载最新版](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V3.1.1_ViewportFit.html) · [📖 查看源码](client/Blackmi_OS_V3.1.1_ViewportFit.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
 
 *Local-first communication, applications and multiplayer games.*
 
@@ -20,15 +20,23 @@
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
 >
-> 当前 V2.9 Party Edition 为开发版。上图为原创界面示意，并非实机截图。
+> 当前 V3.1.1 Refined · Viewport Fit 为开发版，优先适配 834×360 超宽屏 WebView。上图为原创界面示意，并非实机截图。
 
 ---
+
+## 🆕 V3.1.1 · Refined / Viewport Fit
+
+| 桌面 | 应用与游戏 | 兼容性 |
+| :--- | :--- | :--- |
+| macOS 风格悬浮 Dock、渐变图标、时间与连接组件、浅深色主题 | Launchpad 中英文搜索、10 款游戏、开局前选择参赛座位或观战 | 25px 紧凑菜单栏、6px Dock 底部间距、壁纸等比覆盖；优先 834×360 |
+
+本次 3.1.1 是 3.1 的视口适配补丁，不改变其 JavaScript 脚本；3.1 的通信与游戏核心沿用 3.0。浏览器模拟已覆盖 834×360、960×600、834×540；目标旧版 Chromium 80 实机多人联机与性能仍待验收。
 
 ## ✨ 你可以做什么？
 
 | 💬 即时通信 | 🎮 游戏中心 | 🖥️ 桌面体验 |
 | :--- | :--- | :--- |
-| 群聊、私聊、频道、图片、引用回复、@成员、消息搜索 | 9 款联机游戏，最多 8 人大厅，支持观战与对局评论 | Dock、窗口管理、主题、通知中心、活动监视器、应用内黑屏 |
+| 群聊、私聊、频道、图片、引用回复、@成员、消息搜索 | 10 款联机游戏，最多 8 人大厅，支持观战与对局评论 | Dock、窗口管理、主题、通知中心、活动监视器、应用内黑屏 |
 
 | 🔗 本地连接 | 🧩 应用框架 | 🛟 会话恢复 |
 | :--- | :--- | :--- |
@@ -40,7 +48,7 @@
 
 ### 01｜下载并打开
 
-1. 点击上面的 **下载最新版**，保存为 `Blackmi_OS_V2.9_CoverFix.html`。如果浏览器只显示源码，使用浏览器的保存文件功能。
+1. 点击上面的 **下载最新版**，保存为 `Blackmi_OS_V3.1.1_ViewportFit.html`。如果浏览器只显示源码，使用浏览器的保存文件功能。
 2. 在支持 WebRTC 的浏览器或管理方允许的 WebView 中打开该 HTML。文件预览器不一定执行 JavaScript。
 3. 看到 Blackmi OS 桌面后，点击「消息」或「游戏中心」。
 
@@ -87,8 +95,8 @@ flowchart TD
     A["打开游戏中心"] --> B["房主：创建游戏大厅"]
     B --> C["生成邀请 ↔ 成员导入并返回应答"]
     C --> D["房主导入应答，成员加入大厅"]
-    D --> E["成员点击准备入座"]
-    E --> F["房主选择游戏并开始对局"]
+    D --> E["房主选择游戏，成员选择座位或观战"]
+    E --> F["参赛者准备，房主开始对局"]
     F --> G["玩家操作 / 其他成员观战与评论"]
     G --> H["房主结束对局"]
     H --> E
@@ -99,7 +107,7 @@ flowchart TD
 | 创建大厅 | 游戏中心 → 创建游戏大厅 |
 | 邀请成员 | 生成邀请 → 邀请二维码 / 完整连接码 |
 | 加入大厅 | 拍照识别 / 导入连接码，生成应答并交回房主 |
-| 开始对局 | 成员「准备入座」→ 房主打开游戏卡片 → 开始对局 |
+| 开始对局 | 房主选择游戏 → 成员选择参赛座位或观战 → 参赛者准备 → 房主开始对局 |
 | 旁观朋友 | 已有对局 → 进入观战 |
 | 换一种游戏 | 房主「结束对局」→ 选择新的游戏 |
 | 离开 | 退出大厅 |
@@ -115,17 +123,18 @@ flowchart TD
 
 | 人数 | 推荐 |
 | :--- | :--- |
-| 2 人 | 五子棋、中国象棋、八球台球、UNO |
+| 2 人 | 五子棋、中国象棋、八球台球、UNO、坦克大战 |
 | 3 人 | 斗地主、你画我猜、UNO |
-| 4–8 人 | 传话画画、谁是卧底、你画我猜、UNO、德州扑克 |
+| 4–8 人 | 传话画画、谁是卧底、你画我猜、UNO、德州扑克、坦克大战 |
 
-### 🆕 Party Edition 新增
+### 🆕 多人聚会与竞技游戏
 
 | 游戏 | 人数 | 怎么玩 |
 | :--- | :---: | :--- |
 | 🖍️ **传话画画** | 4–8 | 所有人同时写句子、画图、猜图，最后揭晓完整传话作品链 |
 | 🕵️ **谁是卧底** | 4–8 | 获取秘密词语，轮流描述，秘密投票找出卧底 |
 | 🌈 **UNO 彩色纸牌** | 2–8 | 匹配颜色或数字，使用功能牌，率先出完手牌 |
+| 🕹️ **坦克大战** | 2–8 | 虚拟坦克竞技，实时操控与对局状态同步 |
 
 ### 经典游戏
 
@@ -168,7 +177,7 @@ flowchart TD
 <details>
 <summary><b>为什么游戏不能开始？其他人只能观战？</b></summary>
 
-只有房主能够开始对局，且已准备人数必须满足游戏要求。双人游戏只选取符合条件的两位成员，未入座成员可观战。当前一个游戏大厅同时仅支持一场对局。
+只有房主能够开始对局，且已准备人数必须满足游戏要求。双人游戏需明确选择两位参赛者的座位，未入座成员可观战。当前一个游戏大厅同时仅支持一场对局。
 
 </details>
 
@@ -201,7 +210,7 @@ flowchart TD
 flowchart TD
     A["Blackmi OS · Web Desktop"] --> B["App SDK / Window Manager"]
     B --> C["Messages / Contacts"]
-    B --> D["Game Center / 9 Games"]
+    B --> D["Game Center / 10 Games"]
     C --> E["Connect Core / Replica Engine"]
     D --> F["Game Session Engine / GameLink"]
     E --> G["WebRTC DataChannel"]
@@ -224,12 +233,12 @@ flowchart TD
 
 | 项目 | 当前信息 |
 | :--- | :--- |
-| 最新构建 | V2.9 Party Edition · CoverFix |
+| 最新构建 | V3.1.1 Refined · Viewport Fit |
 | 日期 | 2026-11-27 |
-| 文件大小 | 435,083 bytes（约 425 KiB） |
+| 文件大小 | 508,180 bytes（约 496 KiB） |
 | 技术栈 | HTML / CSS / JavaScript / Canvas / WebRTC |
 | 适配目标 | 历史 C6 / Android 9 / Chromium 80 WebView；834×360、960×600 横屏 |
-| 发布状态 | 开发版，V2.9 实机多人联机待验收 |
+| 发布状态 | 开发版，V3.1.1 目标 PAD 实机多人联机待验收 |
 
 | 测试项目 | 状态 |
 | :--- | :--- |
@@ -240,6 +249,8 @@ flowchart TD
 | V2.9 新游戏 | 🧪 开发记录含模拟对局与两种横屏 UI 测试，非真实联机验收 |
 | V2.9 CoverFix | 🧪 三款游戏卡片配色修复；脚本比对一致，源码上传完整性校验通过 |
 | V2.9 C6 多人联机 | ⏳ 待实机验收 |
+| V3.1.1 视口适配 | 🧪 开发记录：三种视口模拟、应用中心启动正常，非旧版 WebView 实机测试 |
+| V3.1.1 通信与游戏 | ⏳ 继承原核心，目标 PAD 实机回归待验收 |
 | ESP32 常驻 Core、AI | 📝 规划阶段，未实现或验收 |
 
 <details>
@@ -255,19 +266,22 @@ flowchart TD
 | V2.8.4.1–2.8.4.2 | 网页层防拖拽补丁、600 词词库 |
 | V2.9 | 传话画画、谁是卧底、UNO |
 | V2.9 CoverFix | 三款新增游戏卡片对比度修复 |
+| V3.0 | Lite 桌面、参赛座位选择、坦克大战 |
+| V3.1 | Refined 视觉重构、Launchpad 搜索 |
+| V3.1.1 | Viewport Fit：超宽屏、壁纸覆盖与紧凑布局 |
 
-版本演进不代表所有中间构建均已归档至 GitHub。
+版本演进不代表所有中间构建均已归档至 GitHub。历史 [V2.9 CoverFix](client/Blackmi_OS_V2.9_CoverFix.html) 仍可下载。
 
-SHA-256（沿用上一版发布记录）：
+SHA-256（V3.1.1，原始文件校验）：
 
 ```text
-8009d91ae0fe2c4a07bafaf81a4278b22e055a31aa5c80e2e1a54ea9001d2cb4
+6416ffd5060199f62a33496be6fc0ddd82e9ec89125ca6df7f90e391bd8861f6
 ```
 
 Git Blob SHA：
 
 ```text
-8b21195eccfa9844287a7f019e68111027ab71b5
+14569370d77d593406317f546bb179a3cdfc5820
 ```
 
 </details>
