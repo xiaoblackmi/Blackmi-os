@@ -347,6 +347,12 @@ tests/       历史测试数据
 
 | 想了解什么？ | 阅读 |
 | :--- | :--- |
+| Codex / AI 开发规范（先读） | [AGENTS.md](AGENTS.md) |
+| 跨会话交接与当前基线 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) |
+| 当前客户端架构 | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| App SDK 与游戏接入 | [SDK.md](SDK.md) |
+| 版本及证据 | [CHANGELOG.md](CHANGELOG.md) |
+| 发布与测试门槛 | [TESTING.md](TESTING.md) |
 | 项目怎么发展到今天 | [开发演进与源码索引](docs/HISTORY.md) |
 | 设备到底支持什么 | [设备画像、权限及历史实测](docs/DEVICE-TESTS.md) |
 | WebRTC 如何建立连接 | [历史 V1/V2 通信机制](docs/RTC-ARCHITECTURE.md) |
