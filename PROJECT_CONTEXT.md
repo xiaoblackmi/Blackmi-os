@@ -18,3 +18,7 @@ V3.1.3 Composer Fix 已归档（消息输入布局与版本显示修复）；V3.
 
 ## 2026-11-28 Hardware Lab V2.0 实机基线
 [能力矩阵](docs/PAD_CAPABILITIES.md)、[性能预算](docs/PERFORMANCE_BUDGET.md)、[原始简化 JSON](tests/Blackmi_PAD_Lab_mwzt8gbr.json)。批次 mwzt8gbr，16/16 QR，CRC32 37252d8d；960×600 短时合成负载，2000简单对象59.6FPS，Worker 1MiB Transferable 往返0.3ms，7对本机 RTC 56/56 ACK。实际跨机通信、内存、后台存活、834×360、长时间游戏性能仍待验收。该报告非 V3.2.1 全功能验收。后续开发按软预算和能力矩阵执行。
+
+## V3.2.2 Developer SDK 候选
+
+基线提交 `266ba0c1810d7bf8f50fbe2baba6637cd585c8b4`。候选 [Blackmi_OS_V3.2.2_DeveloperSDK.html](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 提供 `BlackmiSDK.apps`、`BlackmiSDK.games`、按需绘制和回合制登记。后续 SDK 游戏先写规则和 UI 模块，用 [打包脚本](sdk/bundle.cjs) 生成单 HTML，开发接口见 [SDK.md](SDK.md)。仓库保留 V3.2.1 为正式下载和回滚基线，三国身份战仍是后续任务。

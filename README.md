@@ -387,13 +387,15 @@ tests/       历史测试数据
 | Codex / AI 开发规范（先读） | [AGENTS.md](AGENTS.md) |
 | 跨会话交接与当前基线 | [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md) |
 | 当前客户端架构 | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| App SDK 与游戏接入 | [SDK.md](SDK.md) |
+| 开发者 SDK、本地应用与回合制接入 | [SDK.md](SDK.md) |
 | 版本及证据 | [CHANGELOG.md](CHANGELOG.md) |
 | 发布与测试门槛 | [TESTING.md](TESTING.md) |
 | 项目怎么发展到今天 | [开发演进与源码索引](docs/HISTORY.md) |
 | 设备到底支持什么 | [设备画像、权限及历史实测](docs/DEVICE-TESTS.md) |
 | PAD 最新权限与实机能力 | [Hardware Lab 能力矩阵](docs/PAD_CAPABILITIES.md) |
 | 游戏与系统性能预算 | [PERFORMANCE_BUDGET.md](docs/PERFORMANCE_BUDGET.md) |
+
+开发者可用 [V3.2.2 SDK 候选](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 打包本地应用和回合制游戏。仓库提供 [计数器与取石子示例](sdk/examples) 以及 [测试记录](TESTING.md)。正式下载仍指向 V3.2.1。
 | Hardware Lab V2.0 实测摘要 | [批次 mwzt8gbr JSON](tests/Blackmi_PAD_Lab_mwzt8gbr.json) |
 | WebRTC 如何建立连接 | [历史 V1/V2 通信机制](docs/RTC-ARCHITECTURE.md) |
 | ESP32 与未来架构 | [常驻 Core 设计](docs/CORE-DESIGN.md) |

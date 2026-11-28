@@ -16,3 +16,11 @@ V3.2.1 完整浏览器视觉回归、目标 PAD 真实多人游戏、长时稳�
 
 ## Hardware Lab V2.0（2026-11-28）
 参照 [实测权限](docs/PAD_CAPABILITIES.md) 与 [性能预算](docs/PERFORMANCE_BUDGET.md)，原始简化数据见 [mwzt8gbr](tests/Blackmi_PAD_Lab_mwzt8gbr.json)。960×600 独立 Lab 实测，不是 OS 真机验收。按预算做新增功能性能回归；834×360、真实跨设备通信、完整内存与后台测试仍待补测。
+
+## V3.2.2 Developer SDK 候选（2026-11-28）
+
+- 最新归档的 `mwzt8gbr` 简化 JSON 与已编辑报告的解析内容一致。960×600、DPR 2。Canvas 矩形测试 2,000 个对象为 59.6 FPS，双指记录 728 次 move、2 次 capture。7 对本机 RTC 有 56/56 ACK，实测跨机仍为 ICE `checking` / `Error`，根因未知。
+- `node --test tests/developer-sdk.test.cjs` 检查冻结层及宿主标识、14 款内置游戏模拟开局、前台绘制合并与清理、新游戏注册、玩家和观战快照、旧动作与重复请求、ACK、断线及重开、单文件打包。模拟使用真实 Lobby 逻辑和内存消息队列。
+- 两个 JS 示例通过 TypeScript 严格检查。外层、聊天内嵌与示例脚本共 11 段通过 ES2020 解析，并检查了可选链与空值合并。
+- Linux Headless Chromium 80.0.3987.0 在两个目标视口通过 SDK 启动、计数器绘制、游戏入口烟雾测试。Chromium 131.0.6778.0 在 834×360 和 960×600、DPR 2 下通过触控计数、最小化、关闭重开、消息嵌入、Launchpad、游戏中心与取石子对局 UI。对局使用模拟成员。
+- 待验收 C6 / WPS WebView 真机联机、拼音输入法和宿主键盘布局、30 分钟性能、内存与后台恢复。
