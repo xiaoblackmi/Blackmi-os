@@ -22,3 +22,11 @@ flowchart TD
 - GameLink 全局公开对象仅 status()/diagnostics()；BlackmiApps network.capabilities().gameData=false。不能假设存在公开通用游戏注册/发送 API，详见 SDK.md。
 - 聊天公共历史复制不等于永久存储或自动选主；房主离开游戏可能中止；全部退出后无保证恢复。协议历史见 docs/RTC-ARCHITECTURE.md（V1/V2，非最新版协议规格）。
 - 黑屏是应用内遮罩，不控制设备电源，不修改宿主；底部安全区保留宿主 AI 提示。服务器提案见 docs/CORE-DESIGN.md，未实现。
+
+## V3.2.2 开发候选
+
+[候选 HTML](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 在外层导出 `BlackmiSDK`。本地应用沿用 window manager 和 App SDK，并在已有生命周期上增加按需绘制。受信任的内嵌回合制模块以单份定义注册人数、封面、规则工厂与窗口。
+
+房主在 `Lobby.start` 使用 SDK 规则适配器创建对局。`Lobby.sync` 沿用逐接收方快照，分开序列化公共投影与玩家自己的私有数据。观战者公共投影的身份参数为 `null`，私有数据为空。已有动作、ACK、评论、断线、结束与座位机制继续负责同步。大厅握手仍为 321。注册模块的客户端应使用同一份打包文件。
+
+已将聊天嵌入内容、聊天桥接、GameLink `Link`、二维码和 Lobby 配对握手同 V3.2.1 做逐字节比对。应用层快照在整批投影通过长度校验后派发，发送失败时结束对局并同步清空。接入详见 [SDK.md](SDK.md)。
