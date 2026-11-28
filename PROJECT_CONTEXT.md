@@ -28,3 +28,9 @@ V3.1.3 Composer Fix 已归档（消息输入布局与版本显示修复）；V3.
 `feature/3.3-three-kingdoms` 以 `2b6ab18` 为父提交，用 SDK 接入 [汉末·逐鹿](games/three-kingdoms/README.md)。4–8 人可玩，含四身份、12 位武将、108 张牌和军势。新增模块位于 `games/three-kingdoms/`。[候选单 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms.html) 包含 15 款游戏。
 
 49 项自动测试、125 局模拟、14 款旧游戏开局和 Chromium 80 双视口证据见 [TESTING.md](TESTING.md)。PAD 多机、长时性能与真人平衡性待验。
+
+### V3.3 RC2 复审候选
+
+PR #3 的发布前体验迭代在 `e16e2ce` 上开发。[RC2 单 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html) 增加快速/标准计时、同一出牌阶段累计预算、暂离回席和八人牌桌响应提示。[规则与运行说明](games/three-kingdoms/README.md) · [复测与阵营机器人矩阵](TESTING.md)
+
+原 V3.3、V3.2.2 和 V3.2.1 产物继续保留。真人阵营平衡、目标 PAD 联机及长时性能待验。

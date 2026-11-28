@@ -7,6 +7,7 @@ const { webcrypto } = require('node:crypto');
 const { performance } = require('node:perf_hooks');
 const { test } = require('node:test');
 const { build, modules, release } = require('../games/three-kingdoms/build.cjs');
+const { decide } = require('../games/three-kingdoms/tools/strategy-bot.cjs');
 
 const raw = file => fs.readFileSync(file,'utf8');
 const source = modules.map(raw);
@@ -20,14 +21,17 @@ function seeded(seed) {
   return () => ((seed = (Math.imul(seed,1664525) + 1013904223) >>> 0) / 4294967296);
 }
 
-function match(count = 4, seed = 1) {
+function match(count = 4, seed = 1, settings = {}) {
   let time = 1000;
   const ids = Array.from({length:count}, (_,i) => 'seat-' + i);
   const finished = [];
   const random = seeded(seed);
-  const engine = game.create({players:ids,finish:id => finished.push(id)}, {clock:() => time,random});
+  const engine = game.create({players:ids,hostId:settings.hostId || ids[0],finish:id => finished.push(id)},
+    {clock:() => time,random});
+  if (settings.mode !== null) act(engine,'set-mode',{choice:settings.mode || 'standard'});
   return {engine, ids, finished, random,
     expire() { time = engine.window.deadline; return engine.tick(time); },
+    advance(ms) { time += ms; return engine.tick(time); },
     now() { return time; }};
 }
 
@@ -433,6 +437,132 @@ test('death reveals identity, strips zones, and correct faction result stops pen
   assert.equal(m.window,null);
 });
 
+test('tempo selection belongs to a seated host and falls back to seat 1 or standard', () => {
+  const f = match(5,2,{mode:null,hostId:'seat-2'});
+  const m = f.engine, seq = m.window.seq;
+  assert.equal(m.window.seat,2);
+  assert(m.seats.every(seat => seat.hand.length===0));
+  assert.throws(() => m.act('seat-0',{kind:'set-mode',choice:'fast',seq}),/变化/);
+  assert.throws(() => m.act('seat-2',{kind:'set-mode',choice:'instant',seq}),/不可用/);
+  act(m,'set-mode',{choice:'fast'});
+  assert.equal(m.mode,'fast');
+  assert.equal(m.matchDeadline-f.now(),18*60000);
+  assert.equal(m.playRemaining,24000);
+  const g = match(4,2,{mode:null,hostId:'observer'});
+  assert.equal(g.engine.window.seat,0);
+  assert(g.expire());
+  assert.equal(g.engine.mode,'standard');
+  assert.equal(g.engine.matchDeadline-g.now(),35*60000);
+  assert(g.engine.seats.every(seat => seat.hand.length>=4));
+});
+
+test('active play consumes one allowance across repeated actions and pauses while another player responds', () => {
+  const f = board(['liu','lu']), m = f.engine;
+  const muster = deal(m,0,'muster'), thrust = deal(m,0,'thrust');
+  assert.equal(f.advance(9000),false);
+  act(m,'play',{card:muster});
+  assert.equal(m.window.deadline-f.now(),31000);
+  assert.equal(f.advance(7000),false);
+  act(m,'play',{card:thrust,target:1});
+  assert.equal(m.window.type,'guard');
+  assert.equal(f.advance(6000),false);
+  act(m,'pass');
+  assert.equal(m.window.deadline-f.now(),24000);
+  assert(f.advance(24000));
+  assert.notEqual(m.window.type==='play' && m.window.seat===0,true);
+});
+
+test('consecutive timeouts give a short grace period and returning does not refresh the active budget', () => {
+  const f = board(['liu','lu']), m = f.engine;
+  for (let n=0;n<2;n++) {
+    m.open('guard',1,{source:0,mode:'thrust'});
+    assert(f.expire());
+  }
+  assert.equal(m.seats[1].missed,2);
+  m.open('guard',1,{source:0,mode:'thrust'});
+  const seq = m.window.seq, until = m.window.normalDeadline;
+  assert(m.window.auto);
+  assert.equal(m.window.deadline-f.now(),1800);
+  assert(f.advance(100)===false);
+  act(m,'resume');
+  assert.equal(m.window.seq,seq);
+  assert.equal(m.window.deadline,until);
+  assert.equal(m.seats[1].missed,0);
+  assert.throws(() => act(m,'resume'),/不可用/);
+  m.seats[2].missed=2;
+  assert(m.options(2).some(a => a.kind==='resume'));
+  m.act(m.seats[2].id,{kind:'resume',seq});
+  assert.equal(m.seats[2].missed,0);
+  assert.equal(m.window.deadline,until);
+  m.seats[0].missed=2;
+  m.playRemaining=1000;
+  m.open('play',0);
+  act(m,'resume');
+  assert.equal(m.window.deadline-f.now(),1000);
+});
+
+test('global deadline ends nested decisions and returns every reserved card to a valid zone', () => {
+  for (const phase of ['stars','rewrite','rescue']) {
+    const f = board(['zhuge','lu']), m = f.engine;
+    m.matchDeadline=f.now()+50;
+    if (phase==='stars') {
+      restartTurn(m,0);
+    } else if (phase==='rewrite') {
+      m.open('rewrite',0,{order:extract(m,'edict'),target:1});
+    } else {
+      m.seats[1].hp=1;
+      m.damage(1,0,false);
+    }
+    assert.equal(m.window.type,phase);
+    assert(f.advance(50));
+    assert.equal(m.result.side,'draw');
+    assert.equal(m.result.reason,'clock');
+    assert.deepEqual(f.finished,[null]);
+    assert.equal(m.window,null);
+    verifyInvariants(m,f.now());
+  }
+});
+
+test('all five table sizes finish with idle players and short auto-pass windows', t => {
+  const maxDuration = {};
+  for (const mode of ['fast','standard']) {
+    maxDuration[mode]=0;
+    for (let count=4;count<=8;count++) {
+      const f = match(count,11+count,{mode}), m = f.engine;
+      let passes=0, decisions=0;
+      while (!m.result && decisions++<3000) {
+        passes+=Number(m.window.auto);
+        assert(f.expire());
+        verifyInvariants(m,f.now());
+      }
+      assert(m.result && passes>=count);
+      assert(f.now()<=m.matchDeadline);
+      maxDuration[mode]=Math.max(maxDuration[mode],f.now()-1000);
+    }
+  }
+  t.diagnostic('idle maximum elapsed ms '+JSON.stringify(maxDuration));
+});
+
+test('108-card hand and 30 maximum CJK comments preserve privacy and stay under the transport cap', t => {
+  const {engine:m,ids} = board(['hua'],8);
+  m.seats[0].hand=m.pile.splice(0);
+  m.seats[0].power=3;
+  m.seats.slice(1).forEach(seat => { seat.hp--; });
+  const snapshot = {v:1,t:'snapshot',lobby:'l'.repeat(24),hostTime:1700000000000,
+    state:{id:'m'.repeat(24),kind:'three-kingdoms',phase:'play',players:ids,rev:1,
+      comments:Array.from({length:30},(_,i)=>({id:'i'.repeat(24),name:'姓'.repeat(24),text:'评'.repeat(120),
+        time:1700000000000+i,spectator:false})),data:m.publicFor(null)},
+    private:m.privateFor(ids[0])};
+  assert.equal(snapshot.private.hand.length,108);
+  assert(snapshot.private.options.length>100);
+  assert.equal(m.privateFor(ids[1]).hand.length,0);
+  assert.deepEqual(plain(m.privateFor('spectator')),{});
+  assert(!('hand' in snapshot.state.data.seats[0]));
+  const full = JSON.stringify(snapshot);
+  assert(full.length<120000);
+  t.diagnostic(JSON.stringify({stressHand:108,maxLengthComments:30,chars:full.length,bytes:Buffer.byteLength(full)}));
+});
+
 function scripts(html) {
   return Array.from(html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi),m => m[1]);
 }
@@ -504,7 +634,9 @@ test('bundled game through SDK Lobby uses private projections, ACK, dedupe, reco
   function start() {
     host.prepare(gameId);
     players.forEach((id,seat) => { host.assign(id,seat,host.me); host.setReady(id,true,seat); });
-    host.start(gameId); drain();
+    host.start(gameId);
+    host.action(host.me,{kind:'set-mode',choice:'standard',seq:host.match.rules.window.seq});
+    drain();
   }
   start();
   const m = host.match.rules;
@@ -552,7 +684,7 @@ test('release is reproducible, modules fit budget, source prefix including commu
   const before = raw(basePath).split('<!-- BLACKMI_SDK_BUNDLES -->');
   const markup = output.slice(0,output.indexOf('<script>\n'+source[0]))
     .replace('name="blackmi-version" content="3.3"','name="blackmi-version" content="3.2.2"')
-    .replace("APP_EDITION='Three Kingdoms'","APP_EDITION='Developer SDK'");
+    .replace("APP_EDITION='Three Kingdoms RC2'","APP_EDITION='Developer SDK'");
   assert.equal(markup,before[0]);
   assert(output.endsWith(before[1]));
   assert(scripts(output).slice(-5).every((code,i) => code==='\n'+source[i]+'\n'));
@@ -579,7 +711,10 @@ test('125 seeded full games verify windows, phase monotonicity, card conservatio
       else m.act(m.seats[w.seat].id,payload);
       samples.push(performance.now()-start);
       verifyInvariants(m,f.now());
-      assert(!m.window || m.window.seq>w.seq);
+      if (!timeout && payload.kind === 'resume') {
+        assert.equal(m.window.seq,w.seq);
+        assert.equal(m.seats[w.seat].missed,0);
+      } else assert(!m.window || m.window.seq>w.seq);
       decisions++;
       if (m.window && (step % 12 === 0 || m.window.type === 'stars')) {
         const snapshot = {v:1,t:'snapshot',lobby:'a'.repeat(24),hostTime:f.now(),
@@ -612,4 +747,44 @@ test('125 seeded full games verify windows, phase monotonicity, card conservatio
     maxSnapshotBytes:envelopeSamples.at(-1),p95SnapshotBytes:envelopeSamples[Math.floor(envelopeSamples.length*.95)],
     maxTypicalCommentBytes:typicalMax,maxSaturatedCommentBytes:longestMax,
     p95RuleMs:+samples[Math.floor(samples.length*.95)].toFixed(3),maxRuleMs:+samples.at(-1).toFixed(3)}));
+});
+
+test('400 faction-aware bot tables compare all seat counts and both tempos', t => {
+  const names=Object.fromEntries(Array.from(game.heroes,hero=>[hero.id,hero.name]));
+  const results=[];
+  for (let count=4;count<=8;count++) {
+    for (const mode of ['fast','standard']) {
+      const outcomes={court:0,rebel:0,rogue:0,draw:0};
+      const minutes=[];
+      let decisions=0,clockDraws=0;
+      for (let run=0;run<40;run++) {
+        const f=match(count,6001+count*100+run,{mode}), m=f.engine;
+        const random=seeded(7651+run*130+count);
+        for (let step=0;!m.result&&step<3500;step++) {
+          const w=m.window;
+          const publicView=m.publicFor(null), player=m.seats[w.seat].id;
+          const self=m.privateFor(player);
+          const payload=decide(game,names,publicView,self,random);
+          assert(payload,'bot had no legal response');
+          const think=payload.kind==='resume' ? 300+Math.floor(random()*600) : 650+Math.floor(random()*6600);
+          if (random()<.035 || think>=w.deadline-f.now()) assert(f.expire());
+          else {
+            assert.equal(f.advance(think),false);
+            m.act(player,{...payload,seq:w.seq});
+          }
+          verifyInvariants(m,f.now());
+          decisions++;
+        }
+        assert(m.result,'bot table stalled');
+        assert(f.now()<=m.matchDeadline);
+        outcomes[m.result.side]++;
+        if (m.result.reason==='clock') clockDraws++;
+        minutes.push((f.now()-1000)/60000);
+      }
+      minutes.sort((a,b)=>a-b);
+      results.push({players:count,mode,outcomes,decisions,clockDraws,
+        medianMinutes:+((minutes[19]+minutes[20])/2).toFixed(2)});
+    }
+  }
+  t.diagnostic(JSON.stringify(results));
 });

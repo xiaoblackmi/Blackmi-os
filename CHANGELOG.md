@@ -32,3 +32,9 @@
 - 基线为 PR #2 已审查的 `2b6ab18bb0c8136cffcba40176539e9169684cdc`，通过独立 SDK 游戏注册集成。历史构建 V3.2.1 和 V3.2.2 保留。
 - [Blackmi_OS_V3.3_ThreeKingdoms.html](client/Blackmi_OS_V3.3_ThreeKingdoms.html) 619,489 字节，模块 53,709 字节。SHA-256 `dc33f6bee8007fb894c4ce3effeed01d3f985acd3da769832d7b84f402cdfa4f`。
 - [规则与构建](games/three-kingdoms/README.md) · [自动化、压力快照和浏览器证据](TESTING.md)
+
+### V3.3 RC2 · 2026-11-28
+
+- 快速 18 分钟与标准 35 分钟，出牌累计预算，连续超时转暂离和回席，支持全局时限中止响应链。
+- 牌桌补全攻击来源、目标、效果及座次距离，新增触屏技能装备详情与原创牌面章纹。56 项自动测试、Chrome 80 双视口和 400 局阵营机器人矩阵见 [TESTING.md](TESTING.md)。身份人数配置沿用 RC1。
+- [RC2 单 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html) 631,382 字节，内嵌游戏模块 65,598 字节。SHA-256 `12e06494a01763845b6151446ee87b30952597962aabb2aa4f50a7c03b7e9a6e`。此前的 [V3.3 构建](client/Blackmi_OS_V3.3_ThreeKingdoms.html) 可直接回退。

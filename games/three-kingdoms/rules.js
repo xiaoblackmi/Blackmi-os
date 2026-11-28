@@ -3,8 +3,11 @@
   var deck = game.deck;
   var heroTable = Object.create(null);
   game.heroes.forEach(function(hero) { heroTable[hero.id] = hero; });
-  var timed = {play:38000, discard:12000, guard:10000, duel:10000, rescue:8000,
-    stars:10000, rewrite:10000, harry:10000, scheme:10000};
+  var profiles = Object.freeze({
+    fast:Object.freeze({total:18*60000, play:24000, discard:7000, guard:5000, duel:5000, rescue:4000, skill:6000}),
+    standard:Object.freeze({total:35*60000, play:40000, discard:10000, guard:8000, duel:8000, rescue:6000, skill:8000})
+  });
+  var MODE_MS = 12000, AUTO_AFTER = 2, AUTO_MS = 1800;
   var slots = ['weapon', 'armor', 'charge', 'shelter'];
   var gear = {blade:'weapon', pike:'weapon', armor:'armor', charge:'charge', shelter:'shelter'};
   var actionFields = ['kind', 'card', 'target', 'skill', 'choice'];
@@ -63,7 +66,7 @@
         var hero = heroes[i], hp = hero.hp + (assigned[i] === 'lord' ? 1 : 0);
         return {id:id, hero:hero.id, role:assigned[i], hp:hp, max:hp, alive:true, hand:[],
           gear:{weapon:null, armor:null, charge:null, shelter:null}, delay:[], ward:false,
-          power:0, used:Object.create(null)};
+          power:0, missed:0, used:Object.create(null)};
       });
       this.pile = shuffle(deck.map(function(card) { return card.id; }), this.random);
       this.discard = [];
@@ -74,9 +77,14 @@
       this.turn = 0;
       this.result = null;
       this.turnCap = this.seats.length * 12;
-      for (var seat of this.seats) this.draw(seat, 4);
-      this.begin(this.seats.findIndex(function(seat) { return seat.role === 'lord'; }));
-      this.pump();
+      this.profile = profiles.standard;
+      this.mode = null;
+      this.matchDeadline = null;
+      this.playRemaining = this.profile.play;
+      this.active = this.seats.findIndex(function(seat) { return seat.role === 'lord'; });
+      this.phase = 'mode';
+      var hostSeat = this.index(info.hostId);
+      this.open('mode', hostSeat < 0 ? 0 : hostSeat);
     }
 
     record(message) {
@@ -104,10 +112,10 @@
         Number(this.seats[source].gear.charge !== null) + Number(this.seats[target].gear.shelter !== null));
     }
 
-    range(player) {
+    range(player, march) {
       var weapon = player.gear.weapon;
       var base = weapon === null ? 1 : cardKey(weapon) === 'pike' ? 3 : 2;
-      return base + (this.march ? 2 : 0);
+      return base + (march ? 2 : 0);
     }
 
     drawCard() {
@@ -138,8 +146,22 @@
     mark(player, skill) { player.used[skill] = this.turn; }
 
     open(type, seat, extra) {
-      this.window = Object.assign({type:type, seat:seat, seq:++this.serial,
-        deadline:this.clock() + timed[type]}, extra || {});
+      var openedAt = this.clock();
+      var budget = type === 'mode' ? MODE_MS : type === 'play' ? this.playRemaining :
+        this.profile[type] || this.profile.skill;
+      var normalDeadline = Math.min(openedAt + budget, this.matchDeadline === null ? Infinity : this.matchDeadline);
+      var auto = type !== 'mode' && this.seats[seat].missed >= AUTO_AFTER;
+      this.window = Object.assign({type:type, seat:seat, seq:++this.serial, openedAt:openedAt, auto:auto,
+        normalDeadline:normalDeadline, deadline:auto ? Math.min(normalDeadline,openedAt + AUTO_MS) : normalDeadline}, extra || {});
+    }
+
+    beginMatch(mode) {
+      this.mode = mode;
+      this.profile = profiles[mode];
+      this.matchDeadline = this.clock() + this.profile.total;
+      this.record(mode === 'fast' ? '快速对局开始' : '标准对局开始');
+      for (var seat of this.seats) this.draw(seat, 4);
+      this.begin(this.active);
     }
 
     begin(index) {
@@ -148,6 +170,7 @@
       this.phase = 'prepare';
       this.attacks = 0;
       this.actions = 0;
+      this.playRemaining = this.profile.play;
       this.commandUsed = false;
       this.march = false;
       this.noAttack = false;
@@ -172,7 +195,7 @@
         if (this.jobs.length) {
           this.resolveJob(this.jobs.pop());
         } else if (this.phase === 'play') {
-          if (!this.seats[this.active].alive || this.actions >= 18) this.beginDiscard();
+          if (!this.seats[this.active].alive || this.actions >= 18 || this.playRemaining <= 0) this.beginDiscard();
           else this.open('play', this.active);
         } else if (this.phase === 'discard') {
           var player = this.seats[this.active];
@@ -306,13 +329,13 @@
       }
     }
 
-    conclude(side) {
+    conclude(side, reason) {
       var winners = this.seats.filter(function(player) {
         if (side === 'court') return player.role === 'lord' || player.role === 'ally';
         return side !== 'draw' && player.role === side;
       }).map(function(player) { return player.id; });
       this.phase = 'end';
-      this.result = {side:side, winners:winners};
+      this.result = {side:side, winners:winners, reason:reason || (side === 'draw' ? 'turn-limit' : 'victory')};
       this.window = null;
       this.jobs.length = 0;
       this.finish(winners.length === 1 ? winners[0] : null);
@@ -343,7 +366,7 @@
         var key = cardKey(card);
         if (attack(key) || (key === 'guard' && player.hero === 'zhao' && !this.used(player, 'convert'))) {
           if (fired) for (var enemy of other) {
-            if (this.distance(index, enemy) <= (key === 'feint' ? 1 : this.range(player))) cardOption(card, enemy);
+            if (this.distance(index, enemy) <= (key === 'feint' ? 1 : this.range(player,this.march))) cardOption(card, enemy);
           }
         } else if (gear[key] || key === 'muster' || key === 'flame' || (key === 'remedy' && player.hp < player.max)) {
           cardOption(card);
@@ -393,10 +416,20 @@
 
     options(index) {
       var w = this.window;
-      if (!w || w.seat !== index || this.result) return [];
+      if (!w || this.result || index < 0) return [];
+      var options = this.windowOptions(index,w);
+      if (w.type !== 'mode' && this.seats[index].alive && this.seats[index].missed >= AUTO_AFTER) {
+        options.push({kind:'resume'});
+      }
+      return options;
+    }
+
+    windowOptions(index, w) {
+      if (w.seat !== index) return [];
+      if (w.type === 'mode') return [{kind:'set-mode',choice:'fast'},{kind:'set-mode',choice:'standard'}];
       var player = this.seats[index];
       if (w.type === 'play') return this.playActions(index);
-      if (w.type === 'discard') return player.hand.map(card => ({kind:'discard',card:card}));
+      if (w.type === 'discard') return player.hand.map(card => ({kind:'discard',card:card})).concat({kind:'auto-discard'});
       var result = [{kind:'pass'}];
       if (w.type === 'harry') {
         return result.concat(this.order(index, false).filter(i => this.seats[i].hand.length)
@@ -429,8 +462,9 @@
     }
 
     act(id, input) {
-      var w = this.window, index = this.index(id);
-      requireRule(w && input && index === w.seat && input.seq === w.seq && this.clock() < w.deadline,
+      var w = this.window, index = this.index(id), time = this.clock();
+      requireRule(w && input && index >= 0 && (index === w.seat || input.kind === 'resume') &&
+        input.seq === w.seq && time < w.deadline && (this.matchDeadline === null || time < this.matchDeadline),
         '行动窗口已变化或已超时');
       requireRule(Object.keys(input).every(function(key) { return key === 'seq' || actionFields.includes(key); }),
         '行动字段不合法');
@@ -438,30 +472,56 @@
         return actionFields.every(function(key) { return option[key] === input[key]; });
       });
       requireRule(legal, '该行动当前不可用');
-      this.resolve(w, legal);
+      if (legal.kind === 'resume') {
+        this.seats[index].missed = 0;
+        if (index === w.seat && w.auto) {
+          w.auto = false;
+          w.deadline = w.normalDeadline;
+        }
+        this.record(this.label(index) + '已回席');
+        return;
+      }
+      this.seats[index].missed = 0;
+      this.resolve(w, legal,time);
       this.pump();
     }
 
     tick(time) {
       var w = this.window;
       if (!w || time < w.deadline) return false;
-      if (w.type === 'discard') {
-        this.window = null;
-        var player = this.seats[w.seat];
-        this.discard.push.apply(this.discard, player.hand.splice(this.discardLimit));
-      } else {
-        this.resolve(w, {kind:w.type === 'play' ? 'end-turn' : 'pass'});
+      if (this.matchDeadline !== null && time >= this.matchDeadline) {
+        this.endOnClock(w);
+        return true;
       }
+      if (w.type !== 'mode') {
+        var seat = this.seats[w.seat];
+        if (++seat.missed === AUTO_AFTER) this.record(this.label(w.seat) + '连续超时 · 暂离');
+        seat.missed = Math.min(seat.missed,AUTO_AFTER);
+      }
+      var fallback = w.type === 'mode' ? {kind:'set-mode',choice:'standard'} :
+        {kind:w.type === 'play' ? 'end-turn' : w.type === 'discard' ? 'auto-discard' : 'pass'};
+      this.resolve(w,fallback,time);
       this.pump();
       return true;
     }
 
-    resolve(w, action) {
+    endOnClock(w) {
+      if (w.type === 'stars') this.pile.push(w.look[1],w.look[0]);
+      if (w.type === 'rewrite') this.discard.push(w.order);
+      if (w.type === 'rescue') this.seats[w.target].hp = 1;
+      this.record('全局时限已到');
+      this.conclude('draw','clock');
+    }
+
+    resolve(w, action, time) {
       this.window = null;
       var index = w.seat, player = this.seats[index];
       var target = this.seats[action.target], card = action.card, pass = action.kind === 'pass';
       switch (w.type) {
+        case 'mode':
+          return this.beginMatch(action.choice);
         case 'play':
+          this.playRemaining = Math.max(0,this.playRemaining - Math.max(0,time - w.openedAt));
           if (action.kind === 'end-turn') return this.beginDiscard();
           this.actions++;
           if (action.kind === 'play') return this.playCard(index, card, action.target);
@@ -473,7 +533,8 @@
           this.record(this.label(index) + (this.march && action.choice === 'march' ? '发令强行军' : '发令立垒'));
           return;
         case 'discard':
-          this.spend(player, card);
+          if (action.kind === 'auto-discard') this.discard.push.apply(this.discard,player.hand.splice(this.discardLimit));
+          else this.spend(player, card);
           return;
         case 'stars': {
           var chosen = pass ? w.look[0] : card;
@@ -617,19 +678,23 @@
     }
 
     publicFor() {
-      var w = this.window;
+      var w = this.window, now = this.clock();
       return {
         turn:this.turn, turnCap:this.turnCap, active:this.active, phase:this.phase,
-        pending:w ? {type:w.type, seat:w.seat, seq:w.seq, deadline:w.deadline, remainingMs:Math.max(0, w.deadline - this.clock()), seconds:timed[w.type] / 1000,
+        mode:this.mode, matchRemainingMs:this.matchDeadline === null ? null : Math.max(0,this.matchDeadline - now),
+        pending:w ? {type:w.type, seat:w.seat, seq:w.seq, deadline:w.deadline, remainingMs:Math.max(0,w.deadline - now),
+          auto:w.auto, pierce:!!w.pierce,
           target:w.target === undefined ? null : w.target, source:w.source === undefined ? null : w.source,
           order:w.order === undefined ? null : w.order, mode:w.mode || ''} : null,
         pile:this.pile.length, discard:this.discard.length, top:this.discard.length ? this.discard[this.discard.length - 1] : null,
         attacks:this.attacks, attackLimit:this.noAttack ? 0 : this.march ? 2 : 1,
         discardLimit:this.phase === 'discard' ? this.discardLimit : null,
-        seats:this.seats.map(seat => ({id:seat.id, hero:seat.hero, hp:seat.hp, max:seat.max, gear:Object.assign({}, seat.gear),
+        seats:this.seats.map((seat,i) => ({id:seat.id, hero:seat.hero, hp:seat.hp, max:seat.max, gear:Object.assign({}, seat.gear),
           delayed:seat.delay.slice(), count:seat.hand.length, ward:seat.ward, power:seat.power, alive:seat.alive,
+          away:seat.missed >= AUTO_AFTER, range:this.range(seat,i === this.active && this.march),
           role:seat.role === 'lord' || !seat.alive || this.result ? seat.role : null})),
-        feed:this.events.slice(), result:this.result ? {side:this.result.side, winners:this.result.winners.slice()} : null
+        feed:this.events.slice(), result:this.result ?
+          {side:this.result.side, winners:this.result.winners.slice(), reason:this.result.reason} : null
       };
     }
 
@@ -651,6 +716,7 @@
         if (option.target !== undefined) groups[key].targets.push(option.target);
       }
       return {seat:index, role:seat.role, hand:seat.hand.slice(), options:Object.values(groups),
+        distances:this.seats.map((other,i) => other.alive ? [this.distance(index,i),this.distance(i,index)] : null),
         look:w && w.seat === index && w.type === 'stars' ? w.look.slice() : []};
     }
   }
@@ -658,4 +724,5 @@
   game.create = function(info, controls) { return new Match(info, controls || {}); };
   game.roleSet = roles;
   game.winner = winner;
+  game.profiles = profiles;
 })(BlackmiThreeKingdoms);
