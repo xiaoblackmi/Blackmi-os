@@ -16,8 +16,10 @@
     turn:(m,bots)=>turn(m,bots,[m.pub.turn,m.pub.top,m.pub.drawn,m.pub.dir,m.pub.deadline].join(':'),m.pub.deadline),
     view:function(m,id){
       var p=m.pub,privateState=m.privateFor(id),actions=[];
+      privateState.cards={};
+      for(var idInHand of privateState.hand)privateState.cards[idInHand]=unoCard(idInHand);
       for(var card of privateState.hand)if(m.legal(id,card)){
-        if(unoCard(card).c===-1)for(var color=0;color<4;color++)actions.push({kind:'play',card:card,color:color});
+        if(privateState.cards[card].c===-1)for(var color=0;color<4;color++)actions.push({kind:'play',card:card,color:color});
         else actions.push({kind:'play',card:card});
       }
       var fallback={kind:p.drawn?'pass':'draw'};
@@ -27,6 +29,7 @@
     }
   };
   api.adapters['three-kingdoms']={
+    observe:BlackmiArenaPolicies.observers['three-kingdoms'],
     turn:function(m,bots){
       var w=m.rules.window,id=w&&m.pub.players[w.seat];
       if(!w||w.type==='mode'||!bots[id]||!m.rules.seats[w.seat].alive)return null;

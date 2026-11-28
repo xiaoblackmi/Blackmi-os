@@ -30,6 +30,14 @@
 
 [界面展示](#-界面实录--screenshots) · [功能介绍](#-你可以做什么) · [快速上手](#-快速上手) · [游戏图鉴](#-游戏图鉴) · [技术架构](#-技术架构) · [版本与验收](#-版本与验收)
 
+## V3.4 · AI Arena 开发候选
+
+[下载 V3.4 单 HTML](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/feature/3.4-ai-arena/client/Blackmi_OS_V3.4_AI_Arena.html) · [人机使用与开发指南](sdk/bots/README.md) · [测试结果](TESTING.md#v34-ai-arena-开发候选)
+
+五子棋、UNO、汉末·逐鹿、德州扑克和王国争霸支持单人离线和真人与 AI 混桌。游戏中心内选择「单机人机」可直接开始。混桌使用同版 V3.4 客户端，由房主在赛前准备页增加或补足 AI，真人按正常流程就座和准备。德州积分仅供游戏内娱乐。
+
+V3.4 在独立开发分支等待审查。C6 / WPS WebView 实机单机及跨设备组局待验收。上方 main 下载入口仍对应 V3.2.1。
+
 ## 🆕 V3.2.1 · Kingdoms Reborn
 
 - 在 V3.2 Arcade 的 14 款游戏基础上替换旧王国争霸：48 个不规则省份、2–8 国、45 秒同步规划、每轮最多 4 条私有指令、最多 20 轮。

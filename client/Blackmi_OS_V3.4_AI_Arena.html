@@ -1821,6 +1821,451 @@ return {PadQR, pack, unpack, b32, un32, frameCheck};
 })();
 
 </script><script>
+const BlackmiArenaPolicies=(function(){
+'use strict';
+const ArenaBots={strategies:Object.create(null),observers:Object.create(null)};
+(function(api){
+  'use strict';
+  const rays=[[1,0],[0,1],[1,1],[1,-1]];
+  const weights=[0,3,28,155,950,90000];
+  function span(board,id,stone){
+    const x=id%15,y=(id/15)|0;
+    let points=0,forks=0;
+    for(const [dx,dy] of rays){
+      let length=1,ends=0,jump=0;
+      for(const sign of [1,-1]){
+        let a=x+dx*sign,b=y+dy*sign;
+        while(a>=0&&a<15&&b>=0&&b<15&&board[b*15+a]===stone){
+          length++;a+=dx*sign;b+=dy*sign;
+        }
+        if(a>=0&&a<15&&b>=0&&b<15&&!board[b*15+a]){
+          ends++;
+          a+=dx*sign;b+=dy*sign;
+          if(a>=0&&a<15&&b>=0&&b<15&&board[b*15+a]===stone)jump++;
+        }
+      }
+      if(length>=5)return 90000;
+      if(ends){
+        points+=weights[length]*(ends===2?2.7:1);
+        if(length>=3&&(ends===2||length===4))forks++;
+        if(length>=2&&jump)points+=weights[length+1]*.42;
+      }
+    }
+    return points+Math.max(0,forks-1)*580;
+  }
+  function score(board,id,stone){
+    return span(board,id,stone)+1.07*span(board,id,3-stone)+.025*(14-Math.abs(id%15-7)-Math.abs((id/15|0)-7));
+  }
+  function wins(board,stone){
+    const out=[];
+    for(let id=0;id<225;id++){
+      if(board[id])continue;
+      const x=id%15,y=id/15|0;
+      for(const [dx,dy] of rays){
+        let run=1;
+        for(const sign of [1,-1]){
+          let a=x+dx*sign,b=y+dy*sign;
+          while(a>=0&&a<15&&b>=0&&b<15&&board[b*15+a]===stone){
+            run++;a+=dx*sign;b+=dy*sign;
+          }
+        }
+        if(run>=5){out.push(id);break;}
+      }
+    }
+    return out;
+  }
+  function candidates(board,stone,limit){
+    const frontier=new Set();
+    for(let id=0;id<225;id++)if(board[id]){
+      const x=id%15,y=id/15|0;
+      for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
+        const a=x+dx,b=y+dy;
+        if(a>=0&&a<15&&b>=0&&b<15&&!board[b*15+a])frontier.add(b*15+a);
+      }
+    }
+    if(!frontier.size&&!board[112])frontier.add(112);
+    return Array.from(frontier,id=>({id,value:score(board,id,stone)}))
+      .sort((a,b)=>b.value-a.value||a.id-b.id).slice(0,limit);
+  }
+  api.strategies.gomoku=function({publicState,legalActions,difficulty,random}){
+    const board=publicState.board.slice(),mine=publicState.turn+1,enemy=3-mine;
+    const find=id=>legalActions.find(a=>a.x===id%15&&a.y===(id/15|0));
+    const own=wins(board,mine),block=wins(board,enemy);
+    if(own.length)return find(own[0]);
+    if(block.length)return find(block[0]);
+    const ranked=candidates(board,mine,8);
+    if(!ranked.length)return legalActions[0];
+    if(difficulty==='easy'){
+      const close=ranked.slice(0,3).filter(x=>x.value>=ranked[0].value*.7);
+      return find(close[Math.floor(random()*close.length)].id);
+    }
+    const start=performance.now(),limit=3.4;
+    let best=ranked[0].id,alpha=-Infinity,nodes=0;
+    // Root plus a bounded opponent ply. Each finished branch can improve the legal fallback.
+    for(const root of ranked){
+      if(nodes>=48||performance.now()-start>limit)return find(best);
+      board[root.id]=mine;
+      const threats=wins(board,mine);
+      let worst=root.value;
+      if(threats.length){
+        const counter=wins(board,enemy);
+        if(counter.length)worst=-80000;
+        else if(threats.length>=2)worst=60000;
+        else{
+          // Only one reply prevents the five. Check the strongest continuations after that reply.
+          const block=threats[0];
+          board[block]=enemy;
+          const continuations=candidates(board,mine,3);
+          worst=Math.max(0,root.value*.45);
+          for(const move of continuations){
+            if(nodes>=48||performance.now()-start>limit)break;
+            nodes++;
+            board[move.id]=mine;
+            const fork=wins(board,mine).length>=2&&!wins(board,enemy).length;
+            board[move.id]=0;
+            if(fork){worst=45000;break;}
+          }
+          board[block]=0;
+        }
+      }else for(const reply of candidates(board,enemy,6)){
+        if(nodes>=48)break;
+        nodes++;
+        worst=Math.min(worst,root.value-reply.value*.78);
+        if(worst<=alpha)break;
+      }
+      board[root.id]=0;
+      if(worst>alpha){alpha=worst;best=root.id;}
+    }
+    return find(best);
+  };
+})(ArenaBots);
+
+(function(api) {
+  'use strict';
+  api.strategies.uno=function({publicState:p,privateState,legalActions,difficulty,random}){
+    const hand=privateState.hand,counts=[0,0,0,0],normal=difficulty==='normal';
+    hand.forEach(id=>{const c=privateState.cards[id].c;if(c>=0)counts[c]++;});
+    let best=legalActions[0], value=-Infinity;
+    for(const action of legalActions){
+      if(action.kind!=='play')continue;
+      const card=privateState.cards[action.card],wild=card.c===-1,color=wild?action.color:card.c;
+      let score=random()*.3+counts[color]*.35-(wild?1.1:0);
+      if(normal){
+        const next=(p.turn+(card.v==='R'?-p.dir:p.dir)+p.counts.length)%p.counts.length;
+        const threat=p.counts[next]<=2, stop=['+2','W4','S'].includes(card.v)||card.v==='R'&&p.counts.length===2;
+        score+=counts[color]*.8-(wild?2.1:0);
+        if(stop)score+=threat?7:hand.length<=3?2.5:-1.6;
+        if(card.v==='R'&&p.counts.length>2)score+=p.counts[next]>p.counts[(p.turn+p.dir+p.counts.length)%p.counts.length]?1.4:-1;
+      }
+      if(score>value){value=score;best=action;}
+    }
+    return best;
+  };
+})(ArenaBots);
+
+(function(factory){
+  const policy=factory();
+  if(typeof ArenaBots==='undefined'){
+    if(typeof module==='object'&&module.exports)module.exports=policy;
+    return;
+  }
+  ArenaBots.strategies['three-kingdoms']=function(input){
+    const game=globalThis.BlackmiThreeKingdoms;
+    const names=Object.fromEntries(game.heroes.map(hero=>[hero.id,hero.name]));
+    const action=policy.decide({deck:game.deck},names,input.publicState,input.privateState,input.random,input.difficulty,input.memory);
+    return action?Object.assign({},action,{seq:input.publicState.pending.seq}):null;
+  };
+  ArenaBots.observers['three-kingdoms']=function(view,memory){
+    const names=Object.fromEntries(globalThis.BlackmiThreeKingdoms.heroes.map(hero=>[hero.id,hero.name]));
+    return policy.remember(view,names,memory);
+  };
+})(function(){
+'use strict';
+const offensive = ['进锋', '佯攻', '论阵', '破械', '截粮', '沉锋令', '迟援帖', '借风', '离席计'];
+
+function suspicion(view, heroName, lord) {
+  if (lord < 0) return view.seats.map(() => 0);
+  const target = ' → ' + heroName[view.seats[lord].hero];
+  return view.seats.map(seat => {
+    const name = heroName[seat.hero];
+    let score = 0;
+    for (const line of view.feed) {
+      if (!line.startsWith(name) || !line.endsWith(target)) continue;
+      if (offensive.some(effect => line.includes(effect))) score += 2;
+      if (['协防','授策','行医'].some(effect => line.includes(effect))) score -= 2;
+    }
+    return Math.max(-4,Math.min(4,score));
+  });
+}
+
+function decide(game, names, view, self, random, difficulty, memory) {
+  const seats = view.seats, seat = seats[self.seat], w = view.pending;
+  const lord = seats.findIndex(other => other.role === 'lord');
+  const alive = seats.filter(other => other.alive).length;
+  const normal = difficulty !== 'easy';
+  const lean = normal ? suspicion(view,names,lord).map((value,i) =>
+    Math.max(-4,Math.min(4,value + (memory&&memory.lean ? memory.lean[i]*.45 : 0)))) : seats.map(()=>0);
+  const attacks = self.hand.filter(id => ['thrust','feint'].includes(game.deck[id].key)).length;
+  const guards = self.hand.filter(id=>game.deck[id].key==='guard').length;
+  const strategic = difficulty==='normal';
+  const strongest = strategic ? Math.max(...seats.map((s,i)=>s.alive&&i!==self.seat?s.hp+s.count*.45+s.power*.4:0)) : 0;
+
+  function enemy(index) {
+    if (index === self.seat) return -16;
+    if (self.role === 'rebel') return index === lord ? 9 : -1.8 - lean[index]*.65;
+    if (self.role === 'rogue') {
+      if (index === lord) return alive === 2 ? 10 : -8;
+      if(strategic){
+        const other=seats[index],strength=other.hp+other.count*.45+other.power*.4;
+        const lordWeak=lord>=0&&seats[lord].hp<=2;
+        return 1+strength*.29+(strength>=strongest-.7?1.3:0)+(lordWeak?lean[index]*.95:-lean[index]*.3);
+      }
+      return 2.6 + Math.max(0,lean[index])*.6 + (normal ? seats[index].hp*.12 : 0);
+    }
+    return index === lord ? -15 : 1.1 + lean[index]*.95;
+  }
+
+  function spare(key) {
+    if (key === 'remedy') return seat.hp <= 2 ? 5 : 3;
+    if (key === 'guard') return guards < 2 ? 4 : 1.2;
+    return ['muster','pike','armor','thrust'].includes(key) ? 2.3 : 1;
+  }
+
+  function score(action) {
+    const key = action.card === undefined ? '' : game.deck[action.card].key;
+    const target = action.target === undefined ? null : seats[action.target];
+    const rival = target ? enemy(action.target) : 0;
+    const cost = normal ? spare(key) : key==='remedy'||key==='guard' ? 2 : 1;
+    switch (action.kind) {
+      case 'resume': return 40;
+      case 'set-mode': return -Infinity;
+      case 'end-turn': return 0;
+      case 'auto-discard': return -8;
+      case 'discard': return 6 - cost;
+      case 'pass':
+        if (w.type === 'rescue' || w.type === 'rewrite') return 1;
+        return 0;
+      case 'yield': return w.type === 'scheme' ? 2.2 : 6;
+      case 'armor': return 8;
+      case 'respond': {
+        if (w.type === 'rewrite') {
+          const flipsRed = game.deck[action.card].red;
+          const delaysAttack = game.deck[w.order].key === 'edict';
+          const harms = flipsRed === delaysAttack;
+          const preference = harms ? enemy(w.target) : -enemy(w.target);
+          return preference*.7 - cost*.25;
+        }
+        if (w.type === 'rescue') return -enemy(w.target)*1.25 - cost*.3 + (w.target===self.seat ? 8 : 0);
+        if (normal && w.type === 'guard' && seat.ward && !w.pierce) return -.4;
+        if (normal && w.type === 'duel' && seat.ward && attacks<2) return -.3;
+        return 10 - cost*.4;
+      }
+      case 'choose': return target ? 1.5 + rival*.66 : 2 + cost*.3;
+      case 'command':
+        return action.choice === 'march' ? (attacks>=2 && view.attacks===0 ? 3.2 : -.8) :
+          1.4 - rival*.4 + (target.hp<=2 ? 2 : 0);
+      case 'skill':
+        if (action.skill === 'liu' || action.skill === 'hua') {
+          return -rival*.6 - cost*.35 + (action.skill==='hua' && target.hp<=2 ? 2.6 : 0);
+        }
+        if (action.skill === 'sun') return spare(game.deck[view.top].key)-cost-.2;
+        if (action.skill === 'yuan') return seats.reduce((n,other,i) =>
+          n + (other.alive && i!==self.seat ? enemy(i) : 0),0)*.6-cost-1;
+        return rival*.66 - cost*.6;
+      case 'play':
+        if (['thrust','feint','duel'].includes(key) || key==='guard' && target) {
+          const distance=strategic&&self.distances[action.target] ? self.distances[action.target][0] : 1;
+          return rival + (normal ? (target.hp<=2 ? 1.35 : 0) - Number(target.ward)*1.6 : 0) -
+            (strategic?(Math.max(0,distance-1)*.16+Math.min(target.count,5)*.12):0) -
+            (key==='duel' && attacks<2 ? 2 : 0);
+        }
+        if (key==='muster') return 7;
+        if (key==='remedy') return seat.hp<=2 ? 13 : 6;
+        if (key==='rampart') return 1.4-rival*.42 + Number(target.hp<=2)*1.6;
+        if (key==='flame') return seats.reduce((n,other,i) =>
+          n + (other.alive && i!==self.seat ? enemy(i) - Number(other.ward)*.9 : 0),0)*.67-1;
+        if (['blade','pike','armor','charge','shelter'].includes(key)) {
+          const slot = ['blade','pike'].includes(key) ? 'weapon' : key;
+          const wearing = seat.gear[slot];
+          return wearing===null ? 3.8 : key==='pike' && game.deck[wearing].key==='blade' ? 3.1 : -1;
+        }
+        return rival*.6 + (key==='forage' ? 1.4 : 0);
+      default: return -Infinity;
+    }
+  }
+
+  let best, bestScore=-Infinity;
+  for (const group of self.options) {
+    const inputs = group.targets.length ? group.targets.map(target=>({...group.action,target})) : [group.action];
+    for (const a of inputs) {
+      const value=score(a)+(random()-.5)*(normal ? .85 : 1.1);
+      if (value>bestScore) {bestScore=value;best=a;}
+    }
+  }
+  return best;
+}
+
+function remember(view, names, memory) {
+  const stamp=view.feed.join('|');
+  if(memory.stamp===stamp)return memory;
+  const lord=view.seats.findIndex(seat=>seat.role==='lord');
+  const raw=suspicion(view,names,lord);
+  return {stamp:stamp,lean:raw.map((value,i)=>Math.max(-3,Math.min(3,value*.5+(memory.lean?memory.lean[i]*.65:0))))};
+}
+
+return {decide,remember};
+});
+
+(function(api){
+  'use strict';
+  function opening(hand){
+    const a=Math.floor(hand[0]/4)+2,b=Math.floor(hand[1]/4)+2;
+    const hi=Math.max(a,b),lo=Math.min(a,b),gap=hi-lo;
+    if(!gap)return .47+hi*.032;
+    return Math.min(.85,.10+(hi-2)*.032+(lo-2)*.017+(hand[0]%4===hand[1]%4? .075:0)+
+      (gap<=2? .046:0)+(hi>=11&&lo>=10? .065:0));
+  }
+  function made(rank,boardRank,hand,board){
+    const category=rank[0],hi=Math.max(...hand.map(x=>Math.floor(x/4)+2));
+    let score=[.15,.52,.64,.72,.80,.87,.94,.98,1][category]+(rank[1]||hi)*.006;
+    if(boardRank&&category===boardRank[0]&&rank.every((v,i)=>v===boardRank[i]))score-=.29;
+    if(category===1&&board.some(a=>hand.some(b=>Math.floor(a/4)===Math.floor(b/4))))score+=.055;
+    if(board.length<5&&category<=1){
+      const suits=[0,0,0,0];
+      board.concat(hand).forEach(c=>suits[c%4]++);
+      if(suits.includes(4))score+=.085;
+      const ranks=new Set(board.concat(hand).map(c=>Math.floor(c/4)+2));
+      if(ranks.has(14))ranks.add(1);
+      for(let start=1;start<=10;start++){
+        let found=0;
+        for(let offset=0;offset<5;offset++)if(ranks.has(start+offset))found++;
+        if(found===4){score+=.045;break;}
+      }
+    }
+    return Math.min(1,score);
+  }
+  api.strategies.holdem=function({publicState:p,privateState:me,legalActions,difficulty,persona,random}){
+    const i=p.turn,owed=Math.min(p.stacks[i],Math.max(0,p.high-p.bets[i]));
+    const pot=p.paid.reduce((a,b)=>a+b,0),live=p.folded.filter(x=>!x).length;
+    const bold=persona==='bold',normal=difficulty==='normal';
+    const raw=p.community.length?made(me.rank,me.boardRank,me.hand,p.community):opening(me.hand);
+    const score=raw+(bold? .045:-.015)-(live-2)*(normal? .026:.01);
+    const fold=legalActions.find(a=>a.kind==='fold'),call=legalActions.find(a=>a.kind==='call');
+    const raises=legalActions.filter(a=>a.kind==='raise');
+    const odds=owed/(pot+owed||1),load=owed/(p.stacks[i]||1);
+    const pressure=normal ? Math.max(.22,.17+odds*.69+load*.30) : .36+load*.27;
+    if(owed&&score<pressure)return fold;
+    let raiseAt=p.street==='preflop'? .73:.79;
+    if(!normal)raiseAt+=.035;
+    if(bold)raiseAt-=.09;
+    const bluff=normal&&bold&&!owed&&live<=3&&pot<=130&&score>.19&&random()<.06;
+    if(raises.length&&(score>raiseAt||bluff)){
+      const min=raises[0],other=raises[Math.min(raises.length-1,score>.91?2:1)];
+      return bluff||!normal||!bold&&score<.89?min:other;
+    }
+    return call;
+  };
+})(ArenaBots);
+
+(function(api) {
+  'use strict';
+  var personaWeights={
+    military:{attack:1.35,economy:1,guard:1,diplomacy:.55},
+    economy:{attack:.9,economy:1.5,guard:1,diplomacy:.85},
+    defense:{attack:.83,economy:1.1,guard:1.55,diplomacy:.8},
+    diplomacy:{attack:.9,economy:1.12,guard:1.15,diplomacy:1.8}
+  };
+  var terrain=[1,1.12,1.30,1.17,1.04,1.02];
+  function sum(a){return a.reduce((n,v)=>n+v,0);}
+  function near(i){return [i%8?i-1:-1,i%8<7?i+1:-1,i>=8?i-8:-1,i<40?i+8:-1].filter(v=>v>=0);}
+  function power(a,b){
+    var counter=(a[0]*b[1]+a[1]*b[2]+a[2]*b[0])/Math.max(1,sum(a)*sum(b));
+    return (a[0]+a[1]*1.15+a[2]*1.05)*(1+.27*counter);
+  }
+  function split(a,mode){
+    var n=sum(a),left=mode==='half'?Math.floor(n/2):n-1;
+    var moved=a.map(v=>Math.floor(v*left/n));
+    for(var j=0;sum(moved)<left&&j<9;j++)if(moved[j%3]<a[j%3])moved[j%3]++;
+    return moved;
+  }
+  api.strategies.kingdoms=function(c){
+    var p=c.publicState,i=c.privateState.seat,orders=c.privateState.orders,realm=p.realms[i];
+    var normal=c.difficulty==='normal',w=personaWeights[c.persona]||personaWeights.military;
+    var allies=p.alliances.filter(a=>a.includes(i)).map(a=>a[0]===i?a[1]:a[0]);
+    var tiles=p.tiles,own=tiles.filter(t=>t.owner===i),army=own.reduce((n,t)=>n+sum(t.army),0);
+    var farms=own.reduce((n,t)=>n+t.build[0],0),maintenance=Math.ceil(army/4);
+    var foodPressure=Math.max(0,maintenance-own.length*2-farms*3+8-realm.food/6);
+    var targets=new Set(orders.filter(a=>a.kind==='march'&&tiles[a.to].owner!==i).map(a=>a.to));
+    var diplomacyUsed=orders.some(a=>['ally','trade','accept','break'].includes(a.kind));
+    var land=p.ranking.find(r=>r.i===i).land,late=p.round>=15,rich=normal&&land>=8&&w.economy>=1.12;
+    var local=tiles.map(function(tile,j){
+      var adj=near(j),foes=adj.filter(k=>tiles[k].owner>=0&&tiles[k].owner!==i&&!allies.includes(tiles[k].owner));
+      var open=adj.filter(k=>tiles[k].owner<0);
+      var threat=foes.reduce((n,k)=>Math.max(n,sum(tiles[k].army||[4,1,1])-1),0);
+      return {foes:foes.length,open:open.length,threat:threat,units:sum(tile.army||[4,1,1])};
+    });
+    var best=c.legalActions[0],bestScore=0;
+    for(var a of c.legalActions){
+      var tile=tiles[a.from],from=local[a.from],score=0;
+      if(a.kind==='march'){
+        var dest=tiles[a.to],to=local[a.to],units=split(tile.army,a.mode),moved=sum(units);
+        if(!moved)continue;
+        if(dest.owner===i){
+          if(!normal||to.threat<=to.units||from.threat>=from.units-moved)continue;
+          score=w.guard*(Math.min(moved,to.threat-to.units)*.37+(dest.cap===i?2:0))-.8;
+        }else{
+          if(targets.has(a.to))continue;
+          var def=dest.army||[4,1,1],estimatedTech=dest.owner<0?0:Math.min(2,Math.floor(p.round/6));
+          var attack=power(units,def)*(1+.1*realm.tech[1])*(i===4?1.1:1);
+          var defense=power(def,units)*terrain[dest.terrain]*(1+.18*(dest.build?dest.build[3]:0))*
+            (1+.1*estimatedTech)*(dest.owner===5?1.1:1);
+          if(attack<=defense*(normal?1.13:1.04))continue;
+          var exposed=Math.max(0,from.threat+1-from.units+moved);
+          score=w.attack*(4+Math.min(2,(attack-defense)*.24)+(dest.owner>=0?1.3:0)+(dest.cap>=0?2.6:0))-
+            w.guard*exposed*(tile.cap===i?.55:.26)-.13*moved;
+        }
+      }else if(a.kind==='recruit'){
+        var shortage=(from.threat+3-from.units)+(from.open?6:0)+(tile.cap===i?2:0);
+        score=w.guard*(Math.min(4,shortage*.65)+(from.foes?1.5:0))-
+          foodPressure*.24-(a.unit===0?0:a.unit===1?1.15:.8);
+        if(normal&&a.unit>0&&from.foes&&tile.army[a.unit]<2&&realm.gold>25)score+=1.4;
+        if(realm.food<6)score-=3;
+      }else if(a.kind==='build'){
+        if(a.item===3)score=w.guard*(Math.max(0,from.threat-from.units*.6)*.42+(from.foes?1.1:0)+(tile.cap===i&&from.foes?1.2:0));
+        if(a.item===0)score=w.economy*((late?.35:1.5)+foodPressure*.34+(realm.food<25?1.25:0));
+        if(a.item===1)score=w.economy*((late?.35:1.9)+(realm.gold<30?1.5:0));
+        if(a.item!==3&&rich&&realm.gold<112&&realm.food<115&&late)score-=2.2;
+        if(!from.foes&&a.item!==3)score+=.3;
+        if(orders.filter(o=>o.kind==='build'&&o.item===a.item).length>=2)score-=2;
+      }else if(a.kind==='research'){
+        score=w.economy*(a.item===2?(rich?4.7:2.1):a.item===1?(normal?3:1.9):1.3+foodPressure*.45);
+        if(a.item===1&&land>=5)score+=w.attack*.55;
+        if(realm.gold<13)score-=1.6;
+      }else if(normal&&!diplomacyUsed){
+        if(a.kind==='accept'){
+          var offer=p.offers.find(o=>o.id===a.offer);
+          if(offer.kind==='trade'&&realm.food>28&&realm.gold<170)score=w.diplomacy*(realm.gold<40?2.5:1.2);
+          if(offer.kind==='ally'&&p.round<=11&&!allies.length&&p.realms[offer.from].alive)score=w.diplomacy*2.9;
+        }else if(a.kind==='trade'&&realm.food<32&&p.round<16){
+          score=w.diplomacy*1.9;
+        }else if(a.kind==='ally'&&!allies.length&&land<12&&p.round<=9){
+          var adjacent=tiles.some((t,j)=>t.owner===a.to&&near(j).some(k=>tiles[k].owner===i));
+          if(adjacent)score=w.diplomacy*2.3;
+        }else if(a.kind==='break'&&p.round>=13){
+          var leader=p.ranking[0],border=tiles.some((t,j)=>t.owner===a.to&&near(j).some(k=>tiles[k].owner===i));
+          if(border&&(leader.i===a.to||p.round>=17))score=w.attack*2.8;
+        }
+      }
+      if(a.kind!=='ready')score-=orders.length*.46+(normal?0:.45);
+      if(score>0)score+=c.random()*(normal?.24:.65);
+      if(score>bestScore){bestScore=score;best=a;}
+    }
+    return best;
+  };
+})(ArenaBots);
+
+return ArenaBots;
+})();
 (function(root){'use strict';
 var codec=root.BlackmiV2Codec, MAX=8, copy=v=>JSON.parse(JSON.stringify(v)), now=()=>Date.now();
 function uid(){var a=new Uint32Array(3);crypto.getRandomValues(a);return Array.from(a,x=>('00000000'+x.toString(16)).slice(-8)).join('')}
@@ -2271,7 +2716,7 @@ class Lobby {
 }
 var ArenaBots = (function() {
   'use strict';
-  var strategies=Object.create(null), adapters=Object.create(null);
+  var strategies=BlackmiArenaPolicies.strategies, adapters=Object.create(null);
   var personas={holdem:['steady','bold'],kingdoms:['military','economy','defense','diplomacy']};
   var labels={steady:'保守',bold:'积极',military:'扩张',economy:'经济',defense:'防御',diplomacy:'外交'};
   function same(a,b){
@@ -2284,6 +2729,7 @@ var ArenaBots = (function() {
     constructor(lobby) {
       this.lobby=lobby;
       this.random=Math.random;
+      this.sequence=0;
       this.clear();
     }
     clear() {
@@ -2296,8 +2742,9 @@ var ArenaBots = (function() {
     stop(){this.pending=null;this.active=Object.create(null);this.cursor=0;}
     create(kind,slot,level,persona){
       var options=personas[kind]||[];
-      var id='bot-'+uid();
-      while(this.setup[id]||this.active[id]||this.lobby.players.some(p=>p.id===id))id='bot-'+uid();
+      var suffix=('00000000'+(this.sequence++>>>0).toString(16)).slice(-8);
+      var id='bot-'+uid().slice(0,16)+suffix;
+      check(!this.setup[id]&&!this.active[id]&&!this.lobby.players.some(p=>p.id===id),'AI 座位编号冲突');
       return this.setup[id]={id:id,name:'AI '+(slot+1),difficulty:level||'normal',
         persona:persona||options[slot%options.length]||''};
     }
@@ -2350,8 +2797,14 @@ var ArenaBots = (function() {
       var context=isolate({publicState:view.public,privateState:view.private,legalActions:view.actions,
         difficulty:bot.profile.difficulty,persona:bot.profile.persona,memory:bot.memory});
       var action;
-      try{action=task.policy(Object.freeze(Object.assign({},context,{random:this.random})));}
-      catch(e){l.note('AI 策略异常，已用合法默认动作');}
+      try{
+        action=task.policy(Object.freeze(Object.assign({},context,{random:this.random})));
+        if(action&&typeof action.then==='function'){
+          Promise.resolve(action).catch(()=>{});
+          throw Error('AI 策略必须同步返回');
+        }
+      }
+      catch(e){action=null;l.note('AI 策略异常，已用合法默认动作');}
       var chosen=view.actions.find(candidate=>same(action,candidate));
       if(!chosen)chosen=view.fallback||view.actions[0];
       var before=this.current(now());
@@ -2391,8 +2844,10 @@ var ArenaBots = (function() {
     turn:(m,bots)=>turn(m,bots,[m.pub.turn,m.pub.top,m.pub.drawn,m.pub.dir,m.pub.deadline].join(':'),m.pub.deadline),
     view:function(m,id){
       var p=m.pub,privateState=m.privateFor(id),actions=[];
+      privateState.cards={};
+      for(var idInHand of privateState.hand)privateState.cards[idInHand]=unoCard(idInHand);
       for(var card of privateState.hand)if(m.legal(id,card)){
-        if(unoCard(card).c===-1)for(var color=0;color<4;color++)actions.push({kind:'play',card:card,color:color});
+        if(privateState.cards[card].c===-1)for(var color=0;color<4;color++)actions.push({kind:'play',card:card,color:color});
         else actions.push({kind:'play',card:card});
       }
       var fallback={kind:p.drawn?'pass':'draw'};
@@ -2402,6 +2857,7 @@ var ArenaBots = (function() {
     }
   };
   api.adapters['three-kingdoms']={
+    observe:BlackmiArenaPolicies.observers['three-kingdoms'],
     turn:function(m,bots){
       var w=m.rules.window,id=w&&m.pub.players[w.seat];
       if(!w||w.type==='mode'||!bots[id]||!m.rules.seats[w.seat].alive)return null;
@@ -2500,413 +2956,6 @@ var ArenaBots = (function() {
   };
 })(ArenaBots);
 
-(function(api){
-  'use strict';
-  const rays=[[1,0],[0,1],[1,1],[1,-1]];
-  const weights=[0,3,28,155,950,90000];
-  function span(board,id,stone){
-    const x=id%15,y=(id/15)|0;
-    let points=0,forks=0;
-    for(const [dx,dy] of rays){
-      let length=1,ends=0,jump=0;
-      for(const sign of [1,-1]){
-        let a=x+dx*sign,b=y+dy*sign;
-        while(a>=0&&a<15&&b>=0&&b<15&&board[b*15+a]===stone){
-          length++;a+=dx*sign;b+=dy*sign;
-        }
-        if(a>=0&&a<15&&b>=0&&b<15&&!board[b*15+a]){
-          ends++;
-          a+=dx*sign;b+=dy*sign;
-          if(a>=0&&a<15&&b>=0&&b<15&&board[b*15+a]===stone)jump++;
-        }
-      }
-      if(length>=5)return 90000;
-      if(ends){
-        points+=weights[length]*(ends===2?2.7:1);
-        if(length>=3&&(ends===2||length===4))forks++;
-        if(length>=2&&jump)points+=weights[length+1]*.42;
-      }
-    }
-    return points+Math.max(0,forks-1)*580;
-  }
-  function score(board,id,stone){
-    return span(board,id,stone)+1.07*span(board,id,3-stone)+.025*(14-Math.abs(id%15-7)-Math.abs((id/15|0)-7));
-  }
-  function wins(board,stone){
-    const out=[];
-    for(let id=0;id<225;id++){
-      if(board[id])continue;
-      const x=id%15,y=id/15|0;
-      for(const [dx,dy] of rays){
-        let run=1;
-        for(const sign of [1,-1]){
-          let a=x+dx*sign,b=y+dy*sign;
-          while(a>=0&&a<15&&b>=0&&b<15&&board[b*15+a]===stone){
-            run++;a+=dx*sign;b+=dy*sign;
-          }
-        }
-        if(run>=5){out.push(id);break;}
-      }
-    }
-    return out;
-  }
-  function candidates(board,stone,limit){
-    const frontier=new Set();
-    for(let id=0;id<225;id++)if(board[id]){
-      const x=id%15,y=id/15|0;
-      for(let dy=-2;dy<=2;dy++)for(let dx=-2;dx<=2;dx++){
-        const a=x+dx,b=y+dy;
-        if(a>=0&&a<15&&b>=0&&b<15&&!board[b*15+a])frontier.add(b*15+a);
-      }
-    }
-    if(!frontier.size&&!board[112])frontier.add(112);
-    return Array.from(frontier,id=>({id,value:score(board,id,stone)}))
-      .sort((a,b)=>b.value-a.value||a.id-b.id).slice(0,limit);
-  }
-  api.strategies.gomoku=function({publicState,legalActions,difficulty,random}){
-    const board=publicState.board.slice(),mine=publicState.turn+1,enemy=3-mine;
-    const find=id=>legalActions.find(a=>a.x===id%15&&a.y===(id/15|0));
-    const own=wins(board,mine),block=wins(board,enemy);
-    if(own.length)return find(own[0]);
-    if(block.length)return find(block[0]);
-    const ranked=candidates(board,mine,8);
-    if(!ranked.length)return legalActions[0];
-    if(difficulty==='easy'){
-      const close=ranked.slice(0,3).filter(x=>x.value>=ranked[0].value*.7);
-      return find(close[Math.floor(random()*close.length)].id);
-    }
-    const start=performance.now(),limit=3.4;
-    let best=ranked[0].id,alpha=-Infinity,nodes=0,complete=best;
-    // Root plus a bounded opponent ply. A cutoff keeps the completed one-ply answer.
-    for(const root of ranked){
-      if(nodes>=48||performance.now()-start>limit)return find(complete);
-      board[root.id]=mine;
-      const double=wins(board,mine).length>=2;
-      const replies=candidates(board,enemy,6);
-      let worst=double?60000:root.value;
-      if(!double)for(const reply of replies){
-        nodes++;
-        worst=Math.min(worst,root.value-reply.value*.86);
-        if(worst<=alpha)break;
-      }
-      board[root.id]=0;
-      if(worst>alpha){alpha=worst;best=root.id;}
-    }
-    return find(best);
-  };
-})(ArenaBots);
-
-(function(api) {
-  'use strict';
-  api.strategies.uno=function({publicState:p,privateState,legalActions,difficulty,random}){
-    const hand=privateState.hand,counts=[0,0,0,0],normal=difficulty==='normal';
-    hand.forEach(id=>{const c=unoCard(id).c;if(c>=0)counts[c]++;});
-    let best=legalActions[0], value=-Infinity;
-    for(const action of legalActions){
-      if(action.kind!=='play')continue;
-      const card=unoCard(action.card),wild=card.c===-1,color=wild?action.color:card.c;
-      let score=random()*.3+counts[color]*.35-(wild?1.1:0);
-      if(normal){
-        const next=(p.turn+(card.v==='R'?-p.dir:p.dir)+p.counts.length)%p.counts.length;
-        const threat=p.counts[next]<=2, stop=['+2','W4','S'].includes(card.v)||card.v==='R'&&p.counts.length===2;
-        score+=counts[color]*.8-(wild?2.1:0);
-        if(stop)score+=threat?7:hand.length<=3?2.5:-1.6;
-        if(card.v==='R'&&p.counts.length>2)score+=p.counts[next]>p.counts[(p.turn+p.dir+p.counts.length)%p.counts.length]?1.4:-1;
-      }
-      if(score>value){value=score;best=action;}
-    }
-    return best;
-  };
-})(ArenaBots);
-
-(function(factory){
-  const policy=factory();
-  if(typeof module==='object'&&module.exports)module.exports=policy;
-  else ArenaBots.strategies['three-kingdoms']=function(input){
-    const game=globalThis.BlackmiThreeKingdoms;
-    const names=Object.fromEntries(game.heroes.map(hero=>[hero.id,hero.name]));
-    const action=policy.decide({deck:game.deck},names,input.publicState,input.privateState,input.random,input.difficulty,input.memory);
-    return action?Object.assign({},action,{seq:input.publicState.pending.seq}):null;
-  };
-  if(typeof ArenaBots!=='undefined')ArenaBots.adapters['three-kingdoms'].observe=function(view,memory){
-    const names=Object.fromEntries(globalThis.BlackmiThreeKingdoms.heroes.map(hero=>[hero.id,hero.name]));
-    return policy.remember(view,names,memory);
-  };
-})(function(){
-'use strict';
-const offensive = ['进锋', '佯攻', '论阵', '破械', '截粮', '沉锋令', '迟援帖', '借风', '离席计'];
-
-function suspicion(view, heroName, lord) {
-  if (lord < 0) return view.seats.map(() => 0);
-  const target = ' → ' + heroName[view.seats[lord].hero];
-  return view.seats.map(seat => {
-    const name = heroName[seat.hero];
-    let score = 0;
-    for (const line of view.feed) {
-      if (!line.startsWith(name) || !line.endsWith(target)) continue;
-      if (offensive.some(effect => line.includes(effect))) score += 2;
-      if (['协防','授策','行医'].some(effect => line.includes(effect))) score -= 2;
-    }
-    return Math.max(-4,Math.min(4,score));
-  });
-}
-
-function decide(game, names, view, self, random, difficulty, memory) {
-  const seats = view.seats, seat = seats[self.seat], w = view.pending;
-  const lord = seats.findIndex(other => other.role === 'lord');
-  const alive = seats.filter(other => other.alive).length;
-  const normal = difficulty !== 'easy';
-  const lean = normal ? suspicion(view,names,lord).map((value,i) =>
-    Math.max(-4,Math.min(4,value + (memory&&memory.lean ? memory.lean[i]*.45 : 0)))) : seats.map(()=>0);
-  const attacks = self.hand.filter(id => ['thrust','feint'].includes(game.deck[id].key)).length;
-
-  function enemy(index) {
-    if (index === self.seat) return -16;
-    if (self.role === 'rebel') return index === lord ? 9 : -1.8 - lean[index]*.65;
-    if (self.role === 'rogue') {
-      if (index === lord) return alive === 2 ? 10 : -8;
-      return 2.6 + Math.max(0,lean[index])*.6 + (normal ? seats[index].hp*.12 : 0);
-    }
-    return index === lord ? -15 : 1.1 + lean[index]*.95;
-  }
-
-  function spare(key) {
-    if (key === 'remedy') return seat.hp <= 2 ? 5 : 3;
-    if (key === 'guard') return self.hand.filter(id => game.deck[id].key==='guard').length < 2 ? 4 : 1.2;
-    return ['muster','pike','armor','thrust'].includes(key) ? 2.3 : 1;
-  }
-
-  function score(action) {
-    const key = action.card === undefined ? '' : game.deck[action.card].key;
-    const target = action.target === undefined ? null : seats[action.target];
-    const rival = target ? enemy(action.target) : 0;
-    const cost = normal ? spare(key) : key==='remedy'||key==='guard' ? 2 : 1;
-    switch (action.kind) {
-      case 'resume': return 40;
-      case 'set-mode': return -Infinity;
-      case 'end-turn': return 0;
-      case 'auto-discard': return -8;
-      case 'discard': return 6 - cost;
-      case 'pass':
-        if (w.type === 'rescue' || w.type === 'rewrite') return 1;
-        return 0;
-      case 'yield': return w.type === 'scheme' ? 2.2 : 6;
-      case 'armor': return 8;
-      case 'respond': {
-        if (w.type === 'rewrite') {
-          const flipsRed = game.deck[action.card].red;
-          const delaysAttack = game.deck[w.order].key === 'edict';
-          const harms = flipsRed === delaysAttack;
-          const preference = harms ? enemy(w.target) : -enemy(w.target);
-          return preference*.7 - cost*.25;
-        }
-        if (w.type === 'rescue') return -enemy(w.target)*1.25 - cost*.3 + (w.target===self.seat ? 8 : 0);
-        if (normal && w.type === 'guard' && seat.ward && !w.pierce) return -.4;
-        if (normal && w.type === 'duel' && seat.ward && attacks<2) return -.3;
-        return 10 - cost*.4;
-      }
-      case 'choose': return target ? 1.5 + rival*.66 : 2 + cost*.3;
-      case 'command':
-        return action.choice === 'march' ? (attacks>=2 && view.attacks===0 ? 3.2 : -.8) :
-          1.4 - rival*.4 + (target.hp<=2 ? 2 : 0);
-      case 'skill':
-        if (action.skill === 'liu' || action.skill === 'hua') {
-          return -rival*.6 - cost*.35 + (action.skill==='hua' && target.hp<=2 ? 2.6 : 0);
-        }
-        if (action.skill === 'sun') return spare(game.deck[view.top].key)-cost-.2;
-        if (action.skill === 'yuan') return seats.reduce((n,other,i) =>
-          n + (other.alive && i!==self.seat ? enemy(i) : 0),0)*.6-cost-1;
-        return rival*.66 - cost*.6;
-      case 'play':
-        if (['thrust','feint','duel'].includes(key) || key==='guard' && target) {
-          return rival + (normal ? (target.hp<=2 ? 1.35 : 0) - Number(target.ward)*1.6 : 0) -
-            (key==='duel' && attacks<2 ? 2 : 0);
-        }
-        if (key==='muster') return 7;
-        if (key==='remedy') return seat.hp<=2 ? 13 : 6;
-        if (key==='rampart') return 1.4-rival*.42 + Number(target.hp<=2)*1.6;
-        if (key==='flame') return seats.reduce((n,other,i) =>
-          n + (other.alive && i!==self.seat ? enemy(i) - Number(other.ward)*.9 : 0),0)*.67-1;
-        if (['blade','pike','armor','charge','shelter'].includes(key)) {
-          const slot = ['blade','pike'].includes(key) ? 'weapon' : key;
-          const wearing = seat.gear[slot];
-          return wearing===null ? 3.8 : key==='pike' && game.deck[wearing].key==='blade' ? 3.1 : -1;
-        }
-        return rival*.6 + (key==='forage' ? 1.4 : 0);
-      default: return -Infinity;
-    }
-  }
-
-  let best, bestScore=-Infinity;
-  for (const group of self.options) {
-    const inputs = group.targets.length ? group.targets.map(target=>({...group.action,target})) : [group.action];
-    for (const a of inputs) {
-      const value=score(a)+(random()-.5)*(normal ? .85 : 1.1);
-      if (value>bestScore) {bestScore=value;best=a;}
-    }
-  }
-  return best;
-}
-
-function remember(view, names, memory) {
-  const stamp=view.feed.join('|');
-  if(memory.stamp===stamp)return memory;
-  const lord=view.seats.findIndex(seat=>seat.role==='lord');
-  const raw=suspicion(view,names,lord);
-  return {stamp:stamp,lean:raw.map((value,i)=>Math.max(-3,Math.min(3,value*.5+(memory.lean?memory.lean[i]*.65:0))))};
-}
-
-return {decide,remember};
-});
-
-(function(api){
-  'use strict';
-  function opening(hand){
-    const a=Math.floor(hand[0]/4)+2,b=Math.floor(hand[1]/4)+2;
-    const hi=Math.max(a,b),lo=Math.min(a,b),gap=hi-lo;
-    if(!gap)return .47+hi*.032;
-    return Math.min(.85,.10+(hi-2)*.032+(lo-2)*.017+(hand[0]%4===hand[1]%4? .075:0)+
-      (gap<=2? .046:0)+(hi>=11&&lo>=10? .065:0));
-  }
-  function made(rank,boardRank,hand,board){
-    const category=rank[0],hi=Math.max(...hand.map(x=>Math.floor(x/4)+2));
-    let score=[.15,.52,.64,.72,.80,.87,.94,.98,1][category]+(rank[1]||hi)*.006;
-    if(boardRank&&category===boardRank[0]&&rank.every((v,i)=>v===boardRank[i]))score-=.29;
-    if(category===1&&board.some(a=>hand.some(b=>Math.floor(a/4)===Math.floor(b/4))))score+=.055;
-    if(board.length<5&&category<=1){
-      const suits=[0,0,0,0];
-      board.concat(hand).forEach(c=>suits[c%4]++);
-      if(suits.includes(4))score+=.085;
-      const ranks=new Set(board.concat(hand).map(c=>Math.floor(c/4)+2));
-      if(ranks.has(14))ranks.add(1);
-      for(let start=1;start<=10;start++){
-        let found=0;
-        for(let offset=0;offset<5;offset++)if(ranks.has(start+offset))found++;
-        if(found===4){score+=.045;break;}
-      }
-    }
-    return Math.min(1,score);
-  }
-  api.strategies.holdem=function({publicState:p,privateState:me,legalActions,difficulty,persona,random}){
-    const i=p.turn,owed=Math.min(p.stacks[i],Math.max(0,p.high-p.bets[i]));
-    const pot=p.paid.reduce((a,b)=>a+b,0),live=p.folded.filter(x=>!x).length;
-    const bold=persona==='bold',normal=difficulty==='normal';
-    const raw=p.community.length?made(me.rank,me.boardRank,me.hand,p.community):opening(me.hand);
-    const score=raw+(bold? .045:-.015)-(live-2)*(normal? .026:.01);
-    const fold=legalActions.find(a=>a.kind==='fold'),call=legalActions.find(a=>a.kind==='call');
-    const raises=legalActions.filter(a=>a.kind==='raise');
-    const odds=owed/(pot+owed||1),load=owed/(p.stacks[i]||1);
-    const pressure=normal ? Math.max(.22,.17+odds*.69+load*.30) : .36+load*.27;
-    if(owed&&score<pressure)return fold;
-    let raiseAt=p.street==='preflop'? .73:.79;
-    if(!normal)raiseAt+=.035;
-    if(bold)raiseAt-=.09;
-    const bluff=normal&&bold&&!owed&&live<=3&&pot<=130&&score>.19&&random()<.06;
-    if(raises.length&&(score>raiseAt||bluff)){
-      const min=raises[0],other=raises[Math.min(raises.length-1,score>.91?2:1)];
-      return bluff||!normal||!bold&&score<.89?min:other;
-    }
-    return call;
-  };
-})(ArenaBots);
-
-(function(api) {
-  'use strict';
-  var personaWeights={
-    military:{attack:1.35,economy:1,guard:1,diplomacy:.55},
-    economy:{attack:.9,economy:1.5,guard:1,diplomacy:.85},
-    defense:{attack:.83,economy:1.1,guard:1.55,diplomacy:.8},
-    diplomacy:{attack:.9,economy:1.12,guard:1.15,diplomacy:1.8}
-  };
-  var terrain=[1,1.12,1.30,1.17,1.04,1.02];
-  function sum(a){return a.reduce((n,v)=>n+v,0);}
-  function near(i){return [i%8?i-1:-1,i%8<7?i+1:-1,i>=8?i-8:-1,i<40?i+8:-1].filter(v=>v>=0);}
-  function power(a,b){
-    var counter=(a[0]*b[1]+a[1]*b[2]+a[2]*b[0])/Math.max(1,sum(a)*sum(b));
-    return (a[0]+a[1]*1.15+a[2]*1.05)*(1+.27*counter);
-  }
-  function split(a,mode){
-    var n=sum(a),left=mode==='half'?Math.floor(n/2):n-1;
-    var moved=a.map(v=>Math.floor(v*left/n));
-    for(var j=0;sum(moved)<left&&j<9;j++)if(moved[j%3]<a[j%3])moved[j%3]++;
-    return moved;
-  }
-  api.strategies.kingdoms=function(c){
-    var p=c.publicState,i=c.privateState.seat,orders=c.privateState.orders,realm=p.realms[i];
-    var normal=c.difficulty==='normal',w=personaWeights[c.persona]||personaWeights.military;
-    var allies=p.alliances.filter(a=>a.includes(i)).map(a=>a[0]===i?a[1]:a[0]);
-    var tiles=p.tiles,own=tiles.filter(t=>t.owner===i),army=own.reduce((n,t)=>n+sum(t.army),0);
-    var farms=own.reduce((n,t)=>n+t.build[0],0),maintenance=Math.ceil(army/4);
-    var foodPressure=Math.max(0,maintenance-own.length*2-farms*3+8-realm.food/6);
-    var targets=new Set(orders.filter(a=>a.kind==='march'&&tiles[a.to].owner!==i).map(a=>a.to));
-    var diplomacyUsed=orders.some(a=>['ally','trade','accept','break'].includes(a.kind));
-    var land=p.ranking.find(r=>r.i===i).land,late=p.round>=15,rich=normal&&land>=8&&w.economy>=1.12;
-    var local=tiles.map(function(tile,j){
-      var adj=near(j),foes=adj.filter(k=>tiles[k].owner>=0&&tiles[k].owner!==i&&!allies.includes(tiles[k].owner));
-      var open=adj.filter(k=>tiles[k].owner<0);
-      var threat=foes.reduce((n,k)=>Math.max(n,sum(tiles[k].army||[4,1,1])-1),0);
-      return {foes:foes.length,open:open.length,threat:threat,units:sum(tile.army||[4,1,1])};
-    });
-    var best=c.legalActions[0],bestScore=0;
-    for(var a of c.legalActions){
-      var tile=tiles[a.from],from=local[a.from],score=0;
-      if(a.kind==='march'){
-        var dest=tiles[a.to],to=local[a.to],units=split(tile.army,a.mode),moved=sum(units);
-        if(!moved)continue;
-        if(dest.owner===i){
-          if(!normal||to.threat<=to.units||from.threat>=from.units-moved)continue;
-          score=w.guard*(Math.min(moved,to.threat-to.units)*.37+(dest.cap===i?2:0))-.8;
-        }else{
-          if(targets.has(a.to))continue;
-          var def=dest.army||[4,1,1],estimatedTech=dest.owner<0?0:Math.min(2,Math.floor(p.round/6));
-          var attack=power(units,def)*(1+.1*realm.tech[1])*(i===4?1.1:1);
-          var defense=power(def,units)*terrain[dest.terrain]*(1+.18*(dest.build?dest.build[3]:0))*
-            (1+.1*estimatedTech)*(dest.owner===5?1.1:1);
-          if(attack<=defense*(normal?1.13:1.04))continue;
-          var exposed=Math.max(0,from.threat+1-from.units+moved);
-          score=w.attack*(4+Math.min(2,(attack-defense)*.24)+(dest.owner>=0?1.3:0)+(dest.cap>=0?2.6:0))-
-            w.guard*exposed*(tile.cap===i?.55:.26)-.13*moved;
-        }
-      }else if(a.kind==='recruit'){
-        var shortage=(from.threat+3-from.units)+(from.open?6:0)+(tile.cap===i?2:0);
-        score=w.guard*(Math.min(4,shortage*.65)+(from.foes?1.5:0))-
-          foodPressure*.24-(a.unit===0?0:a.unit===1?1.15:.8);
-        if(normal&&a.unit>0&&from.foes&&tile.army[a.unit]<2&&realm.gold>25)score+=1.4;
-        if(realm.food<6)score-=3;
-      }else if(a.kind==='build'){
-        if(a.item===3)score=w.guard*(Math.max(0,from.threat-from.units*.6)*.42+(from.foes?1.1:0)+(tile.cap===i&&from.foes?1.2:0));
-        if(a.item===0)score=w.economy*((late?.35:1.5)+foodPressure*.34+(realm.food<25?1.25:0));
-        if(a.item===1)score=w.economy*((late?.35:1.9)+(realm.gold<30?1.5:0));
-        if(a.item!==3&&rich&&realm.gold<112&&realm.food<115&&late)score-=2.2;
-        if(!from.foes&&a.item!==3)score+=.3;
-        if(orders.filter(o=>o.kind==='build'&&o.item===a.item).length>=2)score-=2;
-      }else if(a.kind==='research'){
-        score=w.economy*(a.item===2?(rich?4.7:2.1):a.item===1?(normal?3:1.9):1.3+foodPressure*.45);
-        if(a.item===1&&land>=5)score+=w.attack*.55;
-        if(realm.gold<13)score-=1.6;
-      }else if(normal&&!diplomacyUsed){
-        if(a.kind==='accept'){
-          var offer=p.offers.find(o=>o.id===a.offer);
-          if(offer.kind==='trade'&&realm.food>28&&realm.gold<170)score=w.diplomacy*(realm.gold<40?2.5:1.2);
-          if(offer.kind==='ally'&&p.round<=11&&!allies.length&&p.realms[offer.from].alive)score=w.diplomacy*2.9;
-        }else if(a.kind==='trade'&&realm.food<32&&p.round<16){
-          score=w.diplomacy*1.9;
-        }else if(a.kind==='ally'&&!allies.length&&land<12&&p.round<=9){
-          var adjacent=tiles.some((t,j)=>t.owner===a.to&&near(j).some(k=>tiles[k].owner===i));
-          if(adjacent)score=w.diplomacy*2.3;
-        }else if(a.kind==='break'&&p.round>=13){
-          var leader=p.ranking[0],border=tiles.some((t,j)=>t.owner===a.to&&near(j).some(k=>tiles[k].owner===i));
-          if(border&&(leader.i===a.to||p.round>=17))score=w.attack*2.8;
-        }
-      }
-      if(a.kind!=='ready')score-=orders.length*.46+(normal?0:.45);
-      if(score>0)score+=c.random()*(normal?.24:.65);
-      if(score>bestScore){bestScore=score;best=a;}
-    }
-    return best;
-  };
-})(ArenaBots);
-
 (function() {
   'use strict';
   function profiles(kind){return ArenaBots.personas[kind]||[];}
@@ -2973,10 +3022,16 @@ function arenaMember(lobby,id,setup){
 function arenaName(person){
   return person?person.name+(person.difficulty?(person.difficulty==='easy'?' · 简单':' · 普通'):''):'已离开成员';
 }
+function arenaCanStart(lobby,p){
+  if(!p.bots||!p.bots.length)return true;
+  var seated=id=>lobby.players.some(person=>person.id===id);
+  if(!p.seats.some(seated))return false;
+  return p.kind==='holdem'||p.kind==='three-kingdoms'&&!p.seats.includes(lobby.me)?seated(p.seats[0]):true;
+}
 function arenaSeatTools(kind,p,host){
   if(!ArenaBots.supports(kind))return '';
   var bots=p.bots||[];
-  var html='<div class="arena-setup"><b>'+ (p.seats.filter(Boolean).length-bots.length)+' 真人 · '+bots.length+' AI</b>';
+  var html='<div class="arena-setup"><b>'+ (p.seats.filter(Boolean).length-bots.length)+' 真人 · '+bots.length+' AI · 共 '+p.seats.filter(Boolean).length+' 人</b>';
   if(host){
     html+='<select data-bot-total aria-label="自动补位人数"><option value="">自动补 AI…</option>'+
       Array.from({length:p.seats.length-minPlayers(kind)+1},(_,i)=>{
@@ -3078,7 +3133,7 @@ function fitGameCanvas(cv){var host=cv.parentElement;if(!host||!host.clientWidth
 function watchGameCanvas(ctx,cv){var fit=function(){fitGameCanvas(cv)};fit();if(typeof ResizeObserver==='function'){var ro=new ResizeObserver(fit);ro.observe(cv.parentElement);ctx.cleanup(function(){ro.disconnect()});}ctx.listen(window,'resize',fit);if(window.visualViewport)ctx.listen(window.visualViewport,'resize',fit);return fit;}
 function creativeOptions(kind){var o=creativeSettings[kind];if(!o||service.role!=='host')return '';var pick=(k,label,values)=>'<label>'+label+' <select data-creative="'+k+'">'+values.map(v=>'<option value="'+v[0]+'" '+(String(o[k])===String(v[0])?'selected':'')+'>'+v[1]+'</option>').join('')+'</select></label>';var time=(k,l,v)=>pick(k,l,v.map(x=>[x,x+' 秒']));return '<div class="creative-options">'+(kind==='telephone'?pick('mode','模式',[['classic','经典传话'],['fast','极速'],['memory','记忆复刻']])+time('write','写题',[15,30,60])+time('draw','绘画',[30,60,90,120])+time('guess','猜图',[15,30,60]):pick('difficulty','题库',[['all','全部'],['easy','简单'],['normal','普通'],['hard','成语'],['school','校园']])+time('draw','绘画',[45,60,75,90,120]))+'</div>'}
 function seatLabel(k,i){return k==='xiangqi'?['红方','黑方'][i]:k==='gomoku'?['黑方','白方'][i]:k==='eightball'?['玩家 1','玩家 2'][i]:'座位 '+(i+1)}
-function seatPanel(kind){var p=service.setup,host=service.role==='host',online=!!service.me,s=service.state,busy=!!(s&&!['end','aborted'].includes(s.phase));if(!online)return '<div class="gempty"><h2>'+esc(titles[kind])+'</h2><p>请先创建或加入游戏大厅</p>'+(ArenaBots.supports(kind)?btn('bot-solo','单机人机','gprimary'):'')+btn('lobby','前往大厅')+'</div>';if(!p||p.kind!==kind)return '<div class="gempty"><h2>'+esc(titles[kind])+'</h2><p>'+ (busy?'已有对局，请先结束':p?'当前准备：'+esc(titles[p.kind]):'尚未创建赛前准备')+'</p>'+(host&&!busy?btn('prepare',p?'切换到此游戏':'创建赛前准备','gprimary'):'')+(p?btn('setup-open','进入当前准备'):'')+btn('lobby','游戏大厅')+'</div>';var mine=p.seats.indexOf(service.me),count=p.seats.filter(Boolean).length,ready=p.ready.length,valid=count>=minPlayers(kind)&&count===ready&&(kind!=='football'||count%2===0);var html='<div class="seat-layout"><div class="seat-heading"><div><small>赛前准备 · '+needText(kind)+'</small><b>'+esc(titles[kind])+'</b></div><strong>'+ready+' / '+count+' 已准备</strong></div>'+arenaSeatTools(kind,p,host)+'<div class="seat-grid" data-cap="'+p.seats.length+'">'+p.seats.map((id,i)=>{var who=arenaMember(service,id,p),isMine=id===service.me&&!!id,ok=p.ready.includes(id);return '<div class="seat-card '+(isMine?'seat-mine':'')+'"><div class="seat-line"><b>'+seatLabel(kind,i)+'</b><small class="'+(ok?'seat-ok':'')+'">'+(who?(ok?'已准备':'未准备'):'空位')+'</small></div>'+(host?'<select data-seat="'+i+'" aria-label="'+seatLabel(kind,i)+'"><option value="">空座位</option>'+service.players.concat(p.bots||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===id?'selected':'')+'>'+esc(arenaName(x))+(x.id===service.me?'（我）':'')+'</option>').join('')+'</select>':'<div class="seat-name">'+(who?esc(arenaName(who))+(isMine?'（我）':''):'等待入座')+'</div>'+(!who?btn('seat:'+i,'入座','gprimary'):''))+arenaBotTools(kind,i,who,host)+'</div>'}).join('')+'</div><div class="seat-watch"><b>观战 '+service.players.filter(x=>!p.seats.includes(x.id)).length+' 人</b><span>'+esc(service.players.filter(x=>!p.seats.includes(x.id)).map(x=>x.name+(x.id===service.me?'（我）':'')).join('、')||'暂无')+'</span></div>'+creativeOptions(kind)+'<div class="seat-actions">'+(mine>=0?btn('seat:-1','转为观战')+btn('seat-ready',p.ready.includes(service.me)?'取消准备':'确认准备','gprimary'): '<span class="seat-watchlabel">你正在观战 · 选择空座位参加</span>')+(host?btn('seat-random','随机选人')+btn('seat-clear','全部观战')+btn('setup-cancel','取消准备')+btn('start','开始对局','gprimary',!valid):'')+'</div></div>';return html}
+function seatPanel(kind){var p=service.setup,host=service.role==='host',online=!!service.me,s=service.state,busy=!!(s&&!['end','aborted'].includes(s.phase));if(!online)return '<div class="gempty"><h2>'+esc(titles[kind])+'</h2><p>请先创建或加入游戏大厅</p>'+(ArenaBots.supports(kind)?btn('bot-solo','单机人机','gprimary'):'')+btn('lobby','前往大厅')+'</div>';if(!p||p.kind!==kind)return '<div class="gempty"><h2>'+esc(titles[kind])+'</h2><p>'+ (busy?'已有对局，请先结束':p?'当前准备：'+esc(titles[p.kind]):'尚未创建赛前准备')+'</p>'+(host&&!busy?btn('prepare',p?'切换到此游戏':'创建赛前准备','gprimary'):'')+(p?btn('setup-open','进入当前准备'):'')+btn('lobby','游戏大厅')+'</div>';var mine=p.seats.indexOf(service.me),count=p.seats.filter(Boolean).length,ready=p.ready.length,valid=count>=minPlayers(kind)&&count===ready&&(kind!=='football'||count%2===0)&&arenaCanStart(service,p);var html='<div class="seat-layout"><div class="seat-heading"><div><small>赛前准备 · '+needText(kind)+'</small><b>'+esc(titles[kind])+'</b></div><strong>'+ready+' / '+count+' 已准备</strong></div>'+arenaSeatTools(kind,p,host)+'<div class="seat-grid" data-cap="'+p.seats.length+'">'+p.seats.map((id,i)=>{var who=arenaMember(service,id,p),isMine=id===service.me&&!!id,ok=p.ready.includes(id);return '<div class="seat-card '+(isMine?'seat-mine':'')+'"><div class="seat-line"><b>'+seatLabel(kind,i)+'</b><small class="'+(ok?'seat-ok':'')+'">'+(who?(ok?'已准备':'未准备'):'空位')+'</small></div>'+(host?'<select data-seat="'+i+'" aria-label="'+seatLabel(kind,i)+'"><option value="">空座位</option>'+service.players.concat(p.bots||[]).map(x=>'<option value="'+esc(x.id)+'" '+(x.id===id?'selected':'')+'>'+esc(arenaName(x))+(x.id===service.me?'（我）':'')+'</option>').join('')+'</select>':'<div class="seat-name">'+(who?esc(arenaName(who))+(isMine?'（我）':''):'等待入座')+'</div>'+(!who?btn('seat:'+i,'入座','gprimary'):''))+arenaBotTools(kind,i,who,host)+'</div>'}).join('')+'</div><div class="seat-watch"><b>观战 '+service.players.filter(x=>!p.seats.includes(x.id)).length+' 人</b><span>'+esc(service.players.filter(x=>!p.seats.includes(x.id)).map(x=>x.name+(x.id===service.me?'（我）':'')).join('、')||'暂无')+'</span></div>'+creativeOptions(kind)+'<div class="seat-actions">'+(mine>=0?btn('seat:-1','转为观战')+btn('seat-ready',p.ready.includes(service.me)?'取消准备':'确认准备','gprimary'): '<span class="seat-watchlabel">你正在观战 · 选择空座位参加</span>')+(host?btn('seat-random','随机选人')+btn('seat-clear','全部观战')+btn('setup-cancel','取消准备')+btn('start','开始对局','gprimary',!valid):'')+'</div></div>';return html}
 function gameApp(kind,mount,info){register({id:kind,name:info?info.name:titles[kind],wide:!!info,en:info?info.en:kind==='football'?'Space Football':kind==='hide-seek'?'Hide & Seek':kind==='kingdoms'?'Kingdoms':kind==='survival'?'Co-op Survival':kind==='gomoku'?'Gomoku':kind==='draw-guess'?'Draw & Guess':kind==='holdem'?'Hold’em':kind==='xiangqi'?'Xiangqi':kind==='eightball'?'8 Ball':kind==='telephone'?'Drawing Relay':kind==='undercover'?'Undercover':kind==='uno'?'UNO':kind==='tank'?'Tank Arena':'Dou Dizhu',icon:'apps',color:info?info.color:kind==='football'?'#3b846a':kind==='hide-seek'?'#567951':kind==='kingdoms'?'#9b774b':kind==='survival'?'#695d9b':kind==='gomoku'?'#a27c48':kind==='draw-guess'?'#536fb9':kind==='xiangqi'?'#a34b3c':kind==='eightball'?'#245e50':kind==='telephone'?'#9667be':kind==='undercover'?'#506ba0':kind==='uno'?'#d35c48':kind==='tank'?'#4a7467':'#247960',mount:function(ctx){var r=ctx.root;r.innerHTML='<div class="game27 ggame"><header class="ghead"><div><small>BLACKMI PLAY</small><h2>'+esc(titles[kind])+'</h2></div><div class="gheadstatus" data-title></div>'+btn('comments','评论 0')+'<span data-arena-control></span>'+btn('lobby','游戏大厅')+'</header><div class="gnotice" data-notice></div><div data-gate class="ggate"></div><div data-play class="gplay" hidden></div><aside class="g28comments" data-comments hidden><div class="g28ctop"><b>对局评论</b><span data-watch></span>'+btn('close-comments','关闭')+'</div><div class="g28clist" data-clist></div><div class="g28cinput"><input maxlength="120" data-comment placeholder="说点什么…" aria-label="对局评论">'+btn('send-comment','发送','gprimary')+'</div></aside></div>';var gate=r.querySelector('[data-gate]'),play=r.querySelector('[data-play]'),notice=r.querySelector('[data-notice]'),title=r.querySelector('[data-title]');var view=mount(ctx,play),fitCanvas=play.querySelector('canvas')?watchGameCanvas(ctx,play.querySelector('canvas')):function(){},drawer=r.querySelector('[data-comments]'),ci=r.querySelector('[data-comment]'),cl=r.querySelector('[data-clist]'),commentKey='',lastMatch='',lastView=null,lastPrivate=null,lastViewKey='',wasPlaying=false;function commentSend(){var t=ci.value.trim();if(t&&service.state&&service.state.kind===kind&&!service.awaiting){service.act({kind:'comment',text:t});if(!service.error)ci.value=''}}ctx.listen(ci,'keydown',e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();commentSend()}});function render(){var s=service.state,active=s&&s.kind===kind&&!(service.setup&&service.setup.kind===kind&&['end','aborted'].includes(s.phase));var observers=active?service.players.filter(x=>!s.players.includes(x.id)):[];uiText(title,active?(s.players.includes(service.me)?'对局玩家':'观战模式')+' · '+observers.length+' 人观战':service.stage);var controls=active&&service.role==='host'&&s.bots&&s.bots.length?(['end','aborted'].includes(s.phase)?btn('again','再开'):btn('end','结束')):'';uiHTML(r.querySelector('[data-arena-control]'),controls);var cb=r.querySelector('[data-g=comments]');cb.disabled=!active;uiText(cb,'评论 '+(active?(s.comments||[]).length:0));if(!active){drawer.hidden=true;lastMatch='';commentKey='';ci.value=''}else{if(lastMatch!==s.id){lastMatch=s.id;ci.value='';commentKey='';drawer.hidden=true}r.querySelector('[data-watch]').textContent=observers.length+' 人观战';var comments=s.comments||[],key=JSON.stringify(comments);if(key!==commentKey){commentKey=key;cl.innerHTML=comments.map(m=>'<div><b>'+esc(m.name)+(m.spectator?' · 观战':'')+'</b><p>'+esc(m.text)+'</p></div>').join('')||'<small>暂无评论</small>';cl.scrollTop=cl.scrollHeight}ci.disabled=!service.me||service.stage==='房主连接已断开';r.querySelector('[data-g=send-comment]').disabled=ci.disabled||service.awaiting}uiText(notice,displayGameError(service.error||(service.awaiting?'等待房主确认…':'')));notice.hidden=!notice.textContent;gate.hidden=!!active;play.hidden=!active;if(!active){if(wasPlaying&&view.reset)view.reset();wasPlaying=false;lastView=null;lastPrivate=null;lastViewKey='';var html=seatPanel(kind);if(gate._seatHTML!==html){gate._seatHTML=html;gate.innerHTML=html}}else {var vk=[s.id,s.rev,s.phase,service.me,service.role,service.stage,service.awaiting,service.error,service.players.map(x=>x.id+':'+x.name).join('|')].join('\n');if(!wasPlaying){wasPlaying=true;fitCanvas()}if(lastView!==s||lastPrivate!==service.private||lastViewKey!==vk){view.render(s,service.private||{});lastView=s;lastPrivate=service.private;lastViewKey=vk}}}ctx.listen(r,'click',e=>{var b=e.target.closest('[data-g]');if(!b)return;var a=b.dataset.g;if(a==='comments')drawer.hidden=!drawer.hidden;else if(a==='close-comments')drawer.hidden=true;else if(a==='send-comment')commentSend();else if(a==='lobby')root.BlackmiApps.launch('game-center');else if(a==='prepare'||a==='again')asyncRun(()=>service.prepare(kind));else if(a==='start')asyncRun(()=>service.start(kind));else if(a==='bot-solo')asyncRun(()=>service.soloBots(kind));else if(a.indexOf('bot-add:')===0||a.indexOf('bot-remove:')===0){var parts=a.split(':');asyncRun(()=>service.configureBot(+parts[1],parts[0].slice(4)));}else if(a==='setup-open'&&service.setup)root.BlackmiApps.launch(service.setup.kind);else if(a==='setup-cancel')asyncRun(()=>service.cancelSetup());else if(a==='seat-random'||a==='seat-clear')asyncRun(()=>service.fillSeats(a==='seat-random'));else if(a==='seat-ready')asyncRun(()=>service.ready(!service.setup.ready.includes(service.me)));else if(a.indexOf('seat:')===0)asyncRun(()=>service.seat(+a.slice(5)));else if(a==='end'){if(service.role==='host')gameConfirm('结束当前对局？',()=>service.end())}});ctx.listen(gate,'change',e=>{var d=e.target.dataset,v=e.target.value;if(d.botTotal!==undefined){if(v)asyncRun(()=>service.fillBots(+v));return}if(d.botLevel!==undefined||d.botPersona!==undefined){var level=d.botLevel!==undefined;asyncRun(()=>service.configureBot(+(level?d.botLevel:d.botPersona),level?'difficulty':'persona',v));return}if(e.target.dataset.seat!==undefined){var slot=+e.target.dataset.seat,id=e.target.value;asyncRun(()=>id?service.assign(id,slot,service.me):service.clearSeat(slot));return}var k=e.target.dataset.creative;if(k&&creativeSettings[kind])creativeSettings[kind][k]=['write','draw','guess'].includes(k)?+e.target.value:e.target.value});ctx.cleanup(service.on(()=>{if(ctx.isActive())render()}));render();return {activate:()=>{lastView=null;render();if(wasPlaying)fitCanvas()},deactivate:()=>{if(view.pause)view.pause()}}}})}
 function finishText(s){if(s.phase==='aborted')return '连接中断，本局结束';if(s.phase==='end')return s.winner?name(s.winner)+' 获胜':'和棋';return ''}function gameEnd(s){return ['end','aborted'].includes(s.phase)?'<div class="gend">'+esc(finishText(s))+' '+(service.role==='host'?btn('again','再开一局','gprimary'):'')+'</div>':''}
 gameApp('gomoku',function(ctx,p){p.innerHTML='<div class="gboardarea"><canvas class="gboard" width="600" height="600"></canvas></div><aside class="gside"><div data-ginfo></div><div data-gmoves class="gmoves"></div>'+btn('resign','认输')+'<p class="gsub">自由规则：黑先，连续五子及以上获胜。</p></aside>';var c=p.querySelector('canvas'),g=c.getContext('2d'),s=null;function draw(){if(!s)return;var k=38,o=34;g.fillStyle='#d9b57d';g.fillRect(0,0,600,600);g.strokeStyle='#8a663b';g.lineWidth=1.6;for(var i=0;i<15;i++){g.beginPath();g.moveTo(o+i*k,o);g.lineTo(o+i*k,o+14*k);g.moveTo(o,o+i*k);g.lineTo(o+14*k,o+i*k);g.stroke()}for(var x of [3,7,11])for(var y of [3,7,11]){g.fillStyle='#795c3b';g.beginPath();g.arc(o+x*k,o+y*k,3.8,0,Math.PI*2);g.fill()}s.board.forEach((v,i)=>{if(!v)return;var x=o+(i%15)*k,y=o+Math.floor(i/15)*k;g.fillStyle=v===1?'#20262c':'#fff8e9';g.beginPath();g.arc(x,y,16.6,0,Math.PI*2);g.fill();g.strokeStyle=v===1?'#0e1418':'#bba986';g.stroke()});if(s.moves.length){var m=s.moves[s.moves.length-1];g.fillStyle='#e97b42';g.beginPath();g.arc(o+m[0]*k,o+m[1]*k,4,0,Math.PI*2);g.fill()}g.strokeStyle='#e25839';g.lineWidth=3;s.win.forEach(q=>{g.beginPath();g.arc(o+q[0]*k,o+q[1]*k,19,0,Math.PI*2);g.stroke()})}ctx.listen(c,'pointerdown',e=>{if(!s||s.phase!=='play'||s.players[s.turn]!==service.me||service.awaiting)return;var pos=gamePoint(c,e);if(!pos)return;var x=Math.round((pos.x-34)/38),y=Math.round((pos.y-34)/38);if(integer(x,0,14)&&integer(y,0,14))service.act({kind:'place',x:x,y:y})});ctx.listen(p,'click',e=>{if(e.target.closest('[data-g=resign]'))gameConfirm('确认认输？',()=>service.act({kind:'resign'}))});return {render:function(v){s=v;draw();p.querySelector('[data-ginfo]').innerHTML=gameEnd(s)+'<div class="gturn">'+(s.phase==='play'?esc(name(s.players[s.turn]))+' · '+(s.turn===0?'黑棋':'白棋'):'')+'</div>'+s.players.map((id,i)=>'<div class="grow"><span class="gstone '+(i?'white':'')+'"></span><b>'+esc(name(id))+'</b><small>'+(id===service.me?'我':'')+'</small></div>').join('');p.querySelector('[data-gmoves]').textContent='已落子 '+s.moves.length+' 手';p.querySelector('[data-g=resign]').disabled=s.phase!=='play'||!s.players.includes(service.me)}}});
@@ -3231,7 +3286,7 @@ function kingdomsView(ctx,p){
   if(h!==paneKey){paneKey=h;q('[data-krpane]').innerHTML=h}p.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('selected',b.dataset.tab===tab))
  }
  function refresh(){if(!s)return;var i=my(),r=s.realms[i],ready=s.ready.includes(i),alive=s.realms.filter(z=>z.alive).length;uiText(q('[data-krtitle]'),'第 '+s.round+'/'+s.maxRound+'轮 · '+(i>=0?K_NAMES[i]:'观战'));uiText(q('[data-krres]'),r&&r.gold!==null?'金 '+r.gold+'　粮 '+r.food+'　人口 '+r.pop:'');uiText(q('[data-krready]'),s.ready.length+'/'+alive+' 已提交');uiText(q('[data-krhint]'),target?'选择相邻领土':i<0?'观战模式':!r.alive?'国家已淘汰':ready?'等待其他国家':'建设 → 征兵 → 行军');uiText(q('[data-krorders]'),'指令 '+(priv.orders||[]).length+'/4');var sub=q('[data-krsubmit]');sub.disabled=s.phase!=='play'||i<0||!r.alive||service.awaiting;uiText(sub,ready?'撤回提交':'提交本轮');uiHTML(q('[data-krend]'),s.phase==='play'?'':esc(s.phase==='aborted'?'连接中断':s.result||'结束')+' '+esc((s.winners||[]).map(id=>name(id)).join('、'))+' '+(service.role==='host'?btn('again','再开一局','gprimary'):''));
-  uiHTML(q('[data-krlegend]'),s.players.map((id,j)=>'<span><i style="background:'+K_COLORS[j]+'"></i>'+esc(K_NAMES[j])+'</span>').join(''));uiHTML(q('[data-krlist]'),(priv.orders||[]).map((o,j)=>'<div class="krline"><span>'+esc(listText(o))+'</span>'+button('remove:'+j,'取消',!can())+'</div>').join('')||'<p>还没有指令。</p>');panel();draw()
+  uiHTML(q('[data-krlegend]'),s.players.map((id,j)=>'<span><i style="background:'+K_COLORS[j]+'"></i>'+esc(K_NAMES[j]+((s.bots||[]).some(b=>b.id===id)?' · AI':''))+'</span>').join(''));uiHTML(q('[data-krlist]'),(priv.orders||[]).map((o,j)=>'<div class="krline"><span>'+esc(listText(o))+'</span>'+button('remove:'+j,'取消',!can())+'</div>').join('')||'<p>还没有指令。</p>');panel();draw()
  }
  function focus(on){if(win)win.classList.toggle('creative-expanded',on);uiText(q('[data-krfocus]'),on?'退出专注':'专注');requestAnimationFrame(()=>fitGameCanvas(cv))}
  ctx.listen(q('[data-krfocus]'),'click',()=>focus(!(win&&win.classList.contains('creative-expanded'))));ctx.cleanup(()=>{if(win)win.classList.remove('creative-expanded')});
@@ -4634,4 +4689,4 @@ var BlackmiThreeKingdoms = (function() {
   Object.freeze(game);
 })(BlackmiThreeKingdoms);
 
-</script><style>.arena-setup,.arena-seat-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:3px 0}.arena-setup select,.arena-seat-tools select{width:auto;min-width:0;max-width:100%;margin:0 4px 0 0}.arena-seat-tools .gbtn{padding:2px 5px}.arena-seat-tools select{flex:1 1 48px}.arena-setup b{margin-right:7px}</style></body></html>
+</script><style>.arena-setup,.arena-seat-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:3px 0}.arena-setup select,.arena-seat-tools select{width:auto;min-width:0;max-width:100%;margin:0 4px 0 0}.arena-seat-tools .gbtn{padding:2px 5px}.arena-seat-tools select{flex:1 1 48px}.arena-setup b{margin-right:7px}[data-arena-control]:empty{display:none}</style></body></html>

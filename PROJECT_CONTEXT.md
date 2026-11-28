@@ -34,3 +34,11 @@ V3.1.3 Composer Fix 已归档（消息输入布局与版本显示修复）；V3.
 PR #3 的发布前体验迭代在 `e16e2ce` 上开发。[RC2 单 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html) 增加快速/标准计时、同一出牌阶段累计预算、暂离回席和八人牌桌响应提示。[规则与运行说明](games/three-kingdoms/README.md) · [复测与阵营机器人矩阵](TESTING.md)
 
 原 V3.3、V3.2.2 和 V3.2.1 产物继续保留。真人阵营平衡、目标 PAD 联机及长时性能待验。
+
+## V3.4 AI Arena 开发候选
+
+开始开发时，PR #2 草稿头为 `2b6ab18bb0c8136cffcba40176539e9169684cdc`，PR #3 草稿头为 `c1781b7faf6d8b9f2152612dfab0291729a2bd1f`，两者仍开放。实际开发分支 `feature/3.4-ai-arena` 从 PR #3 已审查的 RC2 提交开始，复审目标为 `feature/3.3-three-kingdoms`。
+
+[候选 HTML](client/Blackmi_OS_V3.4_AI_Arena.html) 提供五款内置游戏的离线与混桌 AI，15 款全部保留真人开局。房主 Bot Manager、座位管理和各游戏适配器在 `sdk/bots/`。旧 HTML、底层通信和三国 RC2 规则冻结。[测试与性能记录](TESTING.md) · [构建指南](sdk/bots/README.md)
+
+真实 PAD 上的单机、真人混合跨设备联机、输入与长时内存仍待验收。

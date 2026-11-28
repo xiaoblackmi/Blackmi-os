@@ -1,13 +1,16 @@
 (function(factory){
   const policy=factory();
-  if(typeof module==='object'&&module.exports)module.exports=policy;
-  else ArenaBots.strategies['three-kingdoms']=function(input){
+  if(typeof ArenaBots==='undefined'){
+    if(typeof module==='object'&&module.exports)module.exports=policy;
+    return;
+  }
+  ArenaBots.strategies['three-kingdoms']=function(input){
     const game=globalThis.BlackmiThreeKingdoms;
     const names=Object.fromEntries(game.heroes.map(hero=>[hero.id,hero.name]));
     const action=policy.decide({deck:game.deck},names,input.publicState,input.privateState,input.random,input.difficulty,input.memory);
     return action?Object.assign({},action,{seq:input.publicState.pending.seq}):null;
   };
-  if(typeof ArenaBots!=='undefined')ArenaBots.adapters['three-kingdoms'].observe=function(view,memory){
+  ArenaBots.observers['three-kingdoms']=function(view,memory){
     const names=Object.fromEntries(globalThis.BlackmiThreeKingdoms.heroes.map(hero=>[hero.id,hero.name]));
     return policy.remember(view,names,memory);
   };
@@ -38,12 +41,20 @@ function decide(game, names, view, self, random, difficulty, memory) {
   const lean = normal ? suspicion(view,names,lord).map((value,i) =>
     Math.max(-4,Math.min(4,value + (memory&&memory.lean ? memory.lean[i]*.45 : 0)))) : seats.map(()=>0);
   const attacks = self.hand.filter(id => ['thrust','feint'].includes(game.deck[id].key)).length;
+  const guards = self.hand.filter(id=>game.deck[id].key==='guard').length;
+  const strategic = difficulty==='normal';
+  const strongest = strategic ? Math.max(...seats.map((s,i)=>s.alive&&i!==self.seat?s.hp+s.count*.45+s.power*.4:0)) : 0;
 
   function enemy(index) {
     if (index === self.seat) return -16;
     if (self.role === 'rebel') return index === lord ? 9 : -1.8 - lean[index]*.65;
     if (self.role === 'rogue') {
       if (index === lord) return alive === 2 ? 10 : -8;
+      if(strategic){
+        const other=seats[index],strength=other.hp+other.count*.45+other.power*.4;
+        const lordWeak=lord>=0&&seats[lord].hp<=2;
+        return 1+strength*.29+(strength>=strongest-.7?1.3:0)+(lordWeak?lean[index]*.95:-lean[index]*.3);
+      }
       return 2.6 + Math.max(0,lean[index])*.6 + (normal ? seats[index].hp*.12 : 0);
     }
     return index === lord ? -15 : 1.1 + lean[index]*.95;
@@ -51,7 +62,7 @@ function decide(game, names, view, self, random, difficulty, memory) {
 
   function spare(key) {
     if (key === 'remedy') return seat.hp <= 2 ? 5 : 3;
-    if (key === 'guard') return self.hand.filter(id => game.deck[id].key==='guard').length < 2 ? 4 : 1.2;
+    if (key === 'guard') return guards < 2 ? 4 : 1.2;
     return ['muster','pike','armor','thrust'].includes(key) ? 2.3 : 1;
   }
 
@@ -98,7 +109,9 @@ function decide(game, names, view, self, random, difficulty, memory) {
         return rival*.66 - cost*.6;
       case 'play':
         if (['thrust','feint','duel'].includes(key) || key==='guard' && target) {
+          const distance=strategic&&self.distances[action.target] ? self.distances[action.target][0] : 1;
           return rival + (normal ? (target.hp<=2 ? 1.35 : 0) - Number(target.ward)*1.6 : 0) -
+            (strategic?(Math.max(0,distance-1)*.16+Math.min(target.count,5)*.12):0) -
             (key==='duel' && attacks<2 ? 2 : 0);
         }
         if (key==='muster') return 7;

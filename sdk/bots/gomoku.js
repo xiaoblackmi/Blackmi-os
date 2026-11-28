@@ -74,17 +74,37 @@
       return find(close[Math.floor(random()*close.length)].id);
     }
     const start=performance.now(),limit=3.4;
-    let best=ranked[0].id,alpha=-Infinity,nodes=0,complete=best;
-    // Root plus a bounded opponent ply. A cutoff keeps the completed one-ply answer.
+    let best=ranked[0].id,alpha=-Infinity,nodes=0;
+    // Root plus a bounded opponent ply. Each finished branch can improve the legal fallback.
     for(const root of ranked){
-      if(nodes>=48||performance.now()-start>limit)return find(complete);
+      if(nodes>=48||performance.now()-start>limit)return find(best);
       board[root.id]=mine;
-      const double=wins(board,mine).length>=2;
-      const replies=candidates(board,enemy,6);
-      let worst=double?60000:root.value;
-      if(!double)for(const reply of replies){
+      const threats=wins(board,mine);
+      let worst=root.value;
+      if(threats.length){
+        const counter=wins(board,enemy);
+        if(counter.length)worst=-80000;
+        else if(threats.length>=2)worst=60000;
+        else{
+          // Only one reply prevents the five. Check the strongest continuations after that reply.
+          const block=threats[0];
+          board[block]=enemy;
+          const continuations=candidates(board,mine,3);
+          worst=Math.max(0,root.value*.45);
+          for(const move of continuations){
+            if(nodes>=48||performance.now()-start>limit)break;
+            nodes++;
+            board[move.id]=mine;
+            const fork=wins(board,mine).length>=2&&!wins(board,enemy).length;
+            board[move.id]=0;
+            if(fork){worst=45000;break;}
+          }
+          board[block]=0;
+        }
+      }else for(const reply of candidates(board,enemy,6)){
+        if(nodes>=48)break;
         nodes++;
-        worst=Math.min(worst,root.value-reply.value*.86);
+        worst=Math.min(worst,root.value-reply.value*.78);
         if(worst<=alpha)break;
       }
       board[root.id]=0;

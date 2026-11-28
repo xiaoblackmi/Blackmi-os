@@ -1,6 +1,6 @@
 var ArenaBots = (function() {
   'use strict';
-  var strategies=Object.create(null), adapters=Object.create(null);
+  var strategies=BlackmiArenaPolicies.strategies, adapters=Object.create(null);
   var personas={holdem:['steady','bold'],kingdoms:['military','economy','defense','diplomacy']};
   var labels={steady:'保守',bold:'积极',military:'扩张',economy:'经济',defense:'防御',diplomacy:'外交'};
   function same(a,b){
@@ -13,6 +13,7 @@ var ArenaBots = (function() {
     constructor(lobby) {
       this.lobby=lobby;
       this.random=Math.random;
+      this.sequence=0;
       this.clear();
     }
     clear() {
@@ -25,8 +26,9 @@ var ArenaBots = (function() {
     stop(){this.pending=null;this.active=Object.create(null);this.cursor=0;}
     create(kind,slot,level,persona){
       var options=personas[kind]||[];
-      var id='bot-'+uid();
-      while(this.setup[id]||this.active[id]||this.lobby.players.some(p=>p.id===id))id='bot-'+uid();
+      var suffix=('00000000'+(this.sequence++>>>0).toString(16)).slice(-8);
+      var id='bot-'+uid().slice(0,16)+suffix;
+      check(!this.setup[id]&&!this.active[id]&&!this.lobby.players.some(p=>p.id===id),'AI 座位编号冲突');
       return this.setup[id]={id:id,name:'AI '+(slot+1),difficulty:level||'normal',
         persona:persona||options[slot%options.length]||''};
     }
@@ -79,8 +81,14 @@ var ArenaBots = (function() {
       var context=isolate({publicState:view.public,privateState:view.private,legalActions:view.actions,
         difficulty:bot.profile.difficulty,persona:bot.profile.persona,memory:bot.memory});
       var action;
-      try{action=task.policy(Object.freeze(Object.assign({},context,{random:this.random})));}
-      catch(e){l.note('AI 策略异常，已用合法默认动作');}
+      try{
+        action=task.policy(Object.freeze(Object.assign({},context,{random:this.random})));
+        if(action&&typeof action.then==='function'){
+          Promise.resolve(action).catch(()=>{});
+          throw Error('AI 策略必须同步返回');
+        }
+      }
+      catch(e){action=null;l.note('AI 策略异常，已用合法默认动作');}
       var chosen=view.actions.find(candidate=>same(action,candidate));
       if(!chosen)chosen=view.fallback||view.actions[0];
       var before=this.current(now());

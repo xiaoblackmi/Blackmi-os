@@ -2,11 +2,11 @@
   'use strict';
   api.strategies.uno=function({publicState:p,privateState,legalActions,difficulty,random}){
     const hand=privateState.hand,counts=[0,0,0,0],normal=difficulty==='normal';
-    hand.forEach(id=>{const c=unoCard(id).c;if(c>=0)counts[c]++;});
+    hand.forEach(id=>{const c=privateState.cards[id].c;if(c>=0)counts[c]++;});
     let best=legalActions[0], value=-Infinity;
     for(const action of legalActions){
       if(action.kind!=='play')continue;
-      const card=unoCard(action.card),wild=card.c===-1,color=wild?action.color:card.c;
+      const card=privateState.cards[action.card],wild=card.c===-1,color=wild?action.color:card.c;
       let score=random()*.3+counts[color]*.35-(wild?1.1:0);
       if(normal){
         const next=(p.turn+(card.v==='R'?-p.dir:p.dir)+p.counts.length)%p.counts.length;

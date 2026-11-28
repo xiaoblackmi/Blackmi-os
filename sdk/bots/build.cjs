@@ -4,7 +4,9 @@ const {Script}=require('node:vm');
 
 const base=path.join(__dirname,'../../client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html');
 const release=path.join(__dirname,'../../client/Blackmi_OS_V3.4_AI_Arena.html');
-const modules=['manager.js','adapters.js','gomoku.js','uno.js','three-kingdoms.js','holdem.js','kingdoms.js','seats.js'];
+const engine=['manager.js','adapters.js','seats.js'];
+const policies=['gomoku.js','uno.js','three-kingdoms.js','holdem.js','kingdoms.js'];
+const modules=engine.concat(policies);
 function build(output=release){
   let html=fs.readFileSync(base,'utf8');
   function replace(before,after){
@@ -18,7 +20,13 @@ function build(output=release){
 
   replace('name="blackmi-version" content="3.3"','name="blackmi-version" content="3.4"');
   replace("APP_EDITION='Three Kingdoms RC2'","APP_EDITION='AI Arena'");
-  replace('var service=new Lobby(),',modules.map(name=>fs.readFileSync(path.join(__dirname,name),'utf8')).join('\n')+'\nvar service=new Lobby(),');
+  const source=names=>names.map(name=>fs.readFileSync(path.join(__dirname,name),'utf8')).join('\n');
+  const policyScope="const BlackmiArenaPolicies=(function(){\n'use strict';\n"+
+    "const ArenaBots={strategies:Object.create(null),observers:Object.create(null)};\n"+
+    source(policies)+"\nreturn ArenaBots;\n})();\n";
+  const engineStart="(function(root){'use strict';\nvar codec=root.BlackmiV2Codec, MAX=8";
+  replace(engineStart,policyScope+engineStart);
+  replace('var service=new Lobby(),',source(engine)+'\nvar service=new Lobby(),');
   replace('this.generation=0;this.setup=null}', 'this.generation=0;this.setup=null;this.botManager=new ArenaBots.Manager(this)}');
   replace(" failMatch(message){\n  this.match", " failMatch(message){\n  this.botManager.clear();\n  this.match");
   replace("check(Object.prototype.hasOwnProperty.call(titles,kind),'游戏无效');this.setup=", "check(Object.prototype.hasOwnProperty.call(titles,kind),'游戏无效');this.botManager.clear();this.setup=");
@@ -49,7 +57,9 @@ function build(output=release){
   replace("var cb=r.querySelector('[data-g=comments]');", "var controls=active&&service.role==='host'&&s.bots&&s.bots.length?(['end','aborted'].includes(s.phase)?btn('again','再开'):btn('end','结束')):'';uiHTML(r.querySelector('[data-arena-control]'),controls);var cb=r.querySelector('[data-g=comments]');");
   replace(" plan(i,a){var p=this.pub,o=this.validate", " plan(i,a,preview){var p=this.pub,o=this.validate");
   replace("'计划资源不足');list.push(o)", "'计划资源不足');if(preview)return o;list.push(o)");
-  const css='<style>.arena-setup,.arena-seat-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:3px 0}.arena-setup select,.arena-seat-tools select{width:auto;min-width:0;max-width:100%;margin:0 4px 0 0}.arena-seat-tools .gbtn{padding:2px 5px}.arena-seat-tools select{flex:1 1 48px}.arena-setup b{margin-right:7px}</style>';
+  replace("&&(kind!=='football'||count%2===0);var html=", "&&(kind!=='football'||count%2===0)&&arenaCanStart(service,p);var html=");
+  replace("esc(K_NAMES[j])+'</span>'", "esc(K_NAMES[j]+((s.bots||[]).some(b=>b.id===id)?' · AI':''))+'</span>'");
+  const css='<style>.arena-setup,.arena-seat-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:3px 0}.arena-setup select,.arena-seat-tools select{width:auto;min-width:0;max-width:100%;margin:0 4px 0 0}.arena-seat-tools .gbtn{padding:2px 5px}.arena-seat-tools select{flex:1 1 48px}.arena-setup b{margin-right:7px}[data-arena-control]:empty{display:none}</style>';
   patch('</body></html>',css+'</body></html>');
   for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new Script(match[1]);
   fs.writeFileSync(output,html,{flag:'wx'});

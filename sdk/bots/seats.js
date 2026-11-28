@@ -64,10 +64,16 @@ function arenaMember(lobby,id,setup){
 function arenaName(person){
   return person?person.name+(person.difficulty?(person.difficulty==='easy'?' · 简单':' · 普通'):''):'已离开成员';
 }
+function arenaCanStart(lobby,p){
+  if(!p.bots||!p.bots.length)return true;
+  var seated=id=>lobby.players.some(person=>person.id===id);
+  if(!p.seats.some(seated))return false;
+  return p.kind==='holdem'||p.kind==='three-kingdoms'&&!p.seats.includes(lobby.me)?seated(p.seats[0]):true;
+}
 function arenaSeatTools(kind,p,host){
   if(!ArenaBots.supports(kind))return '';
   var bots=p.bots||[];
-  var html='<div class="arena-setup"><b>'+ (p.seats.filter(Boolean).length-bots.length)+' 真人 · '+bots.length+' AI</b>';
+  var html='<div class="arena-setup"><b>'+ (p.seats.filter(Boolean).length-bots.length)+' 真人 · '+bots.length+' AI · 共 '+p.seats.filter(Boolean).length+' 人</b>';
   if(host){
     html+='<select data-bot-total aria-label="自动补位人数"><option value="">自动补 AI…</option>'+
       Array.from({length:p.seats.length-minPlayers(kind)+1},(_,i)=>{
