@@ -1,6 +1,6 @@
 # Blackmi OS — Codex / AI 开发规则
 
-先阅读 PROJECT_CONTEXT.md、ARCHITECTURE.md、SDK.md、TESTING.md、CHANGELOG.md、docs/ROADMAP.md、docs/SECURITY.md。当前确认的正式源码为 client/Blackmi_OS_V3.1.2_NoticeSafe.html；任何新版本先核实 Git 提交及文件，不凭聊天猜测。若用户指定更新基线，以其明确指示和可检查源码为准。
+先阅读 PROJECT_CONTEXT.md、ARCHITECTURE.md、SDK.md、TESTING.md、CHANGELOG.md、docs/ROADMAP.md、docs/SECURITY.md。当前确认的正式源码为 client/Blackmi_OS_V3.2.1_Kingdoms.html；任何新版本先核实 Git 提交及文件，不凭聊天猜测。若用户指定更新基线，以其明确指示和可检查源码为准。
 
 ## 硬约束
 - 单 HTML、自包含、纯 PAD 优先，Android 9 / Chromium 80 / WPS WebView，834×360 与 960×600 横屏，触控优先。无 CDN、运行时框架依赖；避免可选链、空值合并、逻辑赋值等较新语法/API，必要时验证或降级。
