@@ -1,6 +1,6 @@
 # Blackmi OS — Codex / AI 开发规则
 
-先阅读 PROJECT_CONTEXT.md、ARCHITECTURE.md、SDK.md、TESTING.md、CHANGELOG.md、docs/ROADMAP.md、docs/SECURITY.md。当前确认的正式源码为 client/Blackmi_OS_V3.2.1_Kingdoms.html；任何新版本先核实 Git 提交及文件，不凭聊天猜测。若用户指定更新基线，以其明确指示和可检查源码为准。
+先阅读 PROJECT_CONTEXT.md、ARCHITECTURE.md、SDK.md、TESTING.md、CHANGELOG.md、docs/ROADMAP.md、docs/SECURITY.md、docs/PAD_CAPABILITIES.md、docs/PERFORMANCE_BUDGET.md。当前确认的正式源码为 client/Blackmi_OS_V3.2.1_Kingdoms.html；任何新版本先核实 Git 提交及文件，不凭聊天猜测。若用户指定更新基线，以其明确指示和可检查源码为准。
 
 ## 硬约束
 - 单 HTML、自包含、纯 PAD 优先，Android 9 / Chromium 80 / WPS WebView，834×360 与 960×600 横屏，触控优先。无 CDN、运行时框架依赖；避免可选链、空值合并、逻辑赋值等较新语法/API，必要时验证或降级。
@@ -13,3 +13,6 @@
 先检查源码、描述变更范围和风险。新游戏独立规则/测试，复用 Lobby/座位/快照/ACK/评论及 gameApp，房主权威、秘密状态按接收人隔离。SDK 的 gameData:false，不虚构公共多人 API。最小化 DOM 改动；使用 ctx.listen/cleanup/onFrame；前台按需渲染，后台停止绘制；不引入重型素材和无上限缓存。
 不要原地覆盖历史发布 HTML；新构建明确版本，统一面向用户的版本展示（协议版本独立）。遵循 TESTING.md。默认不改通信与既有游戏，不为视觉重构牺牲性能。
 交付写明变更、文件大小、测试证据、未验收项、回滚基线；同步 README/CHANGELOG/PROJECT_CONTEXT/SDK（接口变化时）。修改当前发布指针须有完整可核实产物；不自动把计划标为发布。每个独立任务优先单独提交或分支。
+
+## PAD 实测约束
+每次新游戏及性能改动遵循 docs/PERFORMANCE_BUDGET.md 的初始软预算；依据 docs/PAD_CAPABILITIES.md 选择 API。Canvas 主线程绘制、Worker 可选计算、DOM 增量更新、回合制事件驱动。不得依赖 OffscreenCanvas、直接剪贴板或下载成功；不能把本机 RTC 回环当跨设备联机验收。超预算须说明并实测，不为性能预算改通信协议。
