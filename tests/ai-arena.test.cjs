@@ -304,6 +304,45 @@ test('Holdem runs 500 seeded hands, multi-hand review and short-stack side pots 
   t.diagnostic(JSON.stringify({seeds:[3403,44000],hands:completed,multiHandTables,holdem:summary(results)}));
 });
 
+test('Kingdoms honors fog, rejects unaffordable and allied orders, and skips defeated countries',()=>{
+  const w=world(),m=new w.KingdomMatch(['x','y','z']),ada=w.ArenaBots.adapters.kingdoms,p=m.pub;
+  const id='x',mine=p.tiles.findIndex(t=>t.owner===0),fog=p.tiles.findIndex((t,j)=>t.owner!==0&&!m.visible(0).has(j));
+  assert(fog>=0);
+  const b=plain(ada.view(m,id));
+  p.tiles[fog].army=[20,3,2];p.tiles[fog].build=[2,2,2,2];m.orders[1]=[{kind:'research',item:0}];
+  assert.deepEqual(b,plain(ada.view(m,id)));
+  const choose=v=>plain(w.ArenaBots.strategies.kingdoms({publicState:v.public,privateState:v.private,
+    legalActions:v.actions,difficulty:'normal',persona:'military',memory:{},random:random(48)}));
+  assert.deepEqual(choose(b),choose(ada.view(m,id)));
+  assert.equal(b.public.tiles[fog].army,null);
+  p.realms[0].gold=0;
+  assert(ada.view(m,id).actions.every(a=>!['recruit','build','research'].includes(a.kind)));
+  const adj=[mine%8?mine-1:mine+1,mine>=8?mine-8:mine+8].find(j=>p.tiles[j].owner!==0);
+  p.tiles[adj].owner=1;p.alliances=[[0,1]];
+  assert(!ada.view(m,id).actions.some(a=>a.kind==='march'&&a.from===mine&&a.to===adj));
+  p.offers=[{id:'old',from:1,to:0,kind:'trade',expires:0}];
+  assert(!ada.view(m,id).actions.some(a=>a.offer==='old'));
+  p.realms[0].alive=false;
+  assert.equal(ada.turn(m,{x:true},0),null);
+});
+
+test('Kingdoms completes 100 seeded strategic games across all table sizes',t=>{
+  const w=world(3404),results=[],reasons={},personas=w.ArenaBots.personas.kingdoms;
+  assert.equal(personas.length,4);
+  for(let i=0;i<100;i++){
+    const m=new w.KingdomMatch(Array.from({length:2+i%7},(_,j)=>'p'+j));
+    results.push(sim(w,'kingdoms',m,{rng:random(45000+i),limit:810,invariant:m=>{
+      assert(m.pub.round<=20);assert(m.orders.every(a=>a.length<=4));
+      assert(m.pub.tiles.every(x=>x.army.reduce((a,b)=>a+b,0)<=30&&x.build.every(v=>v>=0&&v<=2)));
+      assert(m.pub.realms.every(r=>r.gold>=0&&r.gold<=180&&r.food>=0&&r.food<=180&&r.pop>=0&&r.pop<=90));
+      assert.equal(new Set(m.pub.ready).size,m.pub.ready.length);
+    }}));
+    assert.equal(m.pub.phase,'end');
+    reasons[m.pub.result]=(reasons[m.pub.result]||0)+1;
+  }
+  t.diagnostic(JSON.stringify({seeds:[3404,'45000–45099'],kingdoms:summary(results),reasons}));
+});
+
 test('candidate is deterministic and transport, pairing, chat and AIGC remain exact',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arena-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

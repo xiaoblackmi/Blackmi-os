@@ -66,5 +66,61 @@
         high:p.high,folded:p.folded},private:privateState,actions:actions,fallback:p.high===p.bets[p.turn]?actions[1]:actions[0]};
     }
   };
-  api.turn=turn;
+  function kingdomLegal(m,id,a){
+    var p=m.pub,i=p.players.indexOf(id);
+    if(i<0||p.phase!=='play'||a.round!==p.round||now()>=p.deadline||!p.realms[i].alive||p.ready.includes(i))return false;
+    if(a.kind==='ready')return true;
+    if(a.kind==='accept'&&!p.offers.some(o=>o.id===a.offer&&o.to===i&&o.expires>=p.round))return false;
+    try{m.plan(i,a,true);return true;}catch(e){return false;}
+  }
+  api.adapters.kingdoms={
+    turn:function(m,bots,cursor){
+      var p=m.pub,n=p.players.length;
+      for(var j=0;j<n;j++){
+        var i=(cursor+j)%n,id=p.players[i];
+        if(bots[id]&&p.realms[i].alive&&!p.ready.includes(i))return {id:id,index:i,key:p.round+':'+m.orders[i].length,deadline:p.deadline};
+      }
+      return null;
+    },
+    legal:kingdomLegal,
+    view:function(m,id){
+      var p=m.publicFor(id),own=m.privateFor(id),i=p.players.indexOf(id),r=p.realms[i];
+      var fallback={kind:'ready',round:p.round},actions=[fallback];
+      function add(a){
+        a.round=p.round;
+        if(kingdomLegal(m,id,a))actions.push(a);
+      }
+      if(own.orders.length<4){
+        p.tiles.forEach(function(tile,j){
+          if(tile.owner!==i)return;
+          var garrison=kSum(tile.army),near=kNeighbors(j);
+          var border=near.some(k=>p.tiles[k].owner!==i&&!kAlliance(p,i,p.tiles[k].owner));
+          if(border||tile.cap>=0){
+            if(garrison<=27&&r.pop>=2)for(var unit=0;unit<(tile.build[2]>0?3:1);unit++)add({kind:'recruit',from:j,unit:unit});
+            if(tile.build[3]<2)add({kind:'build',from:j,item:3});
+          }
+          if(tile.build[0]<2)add({kind:'build',from:j,item:0});
+          if(tile.build[1]<2)add({kind:'build',from:j,item:1});
+          if(garrison>1&&!own.orders.some(o=>o.kind==='march'&&o.from===j)){
+            for(var k of near){
+              var to=p.tiles[k];
+              if(kAlliance(p,i,to.owner))continue;
+              if(to.owner===i&&kSum(to.army)+Math.floor(garrison/2)>30)continue;
+              add({kind:'march',from:j,to:k,mode:'half'});
+              if(to.owner!==i||kSum(to.army)+garrison-1<=30)add({kind:'march',from:j,to:k,mode:'full'});
+            }
+          }
+        });
+        r.tech.forEach((level,item)=>{if(level<3)add({kind:'research',item:item});});
+        p.offers.forEach(o=>{if(o.to===i&&p.realms[o.from].alive)add({kind:'accept',offer:o.id});});
+        p.realms.forEach((realm,j)=>{
+          if(i===j||!realm.alive)return;
+          if(kAlliance(p,i,j))add({kind:'break',to:j});
+          else if(p.round<=9&&!p.offers.some(o=>o.from===i&&o.to===j&&o.kind==='ally'))add({kind:'ally',to:j});
+          if(r.gold>=6&&r.food<165&&!p.offers.some(o=>o.from===i&&o.to===j&&o.kind==='trade'))add({kind:'trade',to:j});
+        });
+      }
+      return {public:p,private:{seat:i,orders:own.orders},actions:actions,fallback:fallback};
+    }
+  };
 })(ArenaBots);

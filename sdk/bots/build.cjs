@@ -4,7 +4,7 @@ const {Script}=require('node:vm');
 
 const base=path.join(__dirname,'../../client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html');
 const release=path.join(__dirname,'../../client/Blackmi_OS_V3.4_AI_Arena.html');
-const modules=['manager.js','adapters.js','gomoku.js','uno.js','three-kingdoms.js','holdem.js','seats.js'];
+const modules=['manager.js','adapters.js','gomoku.js','uno.js','three-kingdoms.js','holdem.js','kingdoms.js','seats.js'];
 function build(output=release){
   let html=fs.readFileSync(base,'utf8');
   function replace(before,after){
@@ -47,6 +47,8 @@ function build(output=release){
   replace("ctx.listen(gate,'change',e=>{if(e.target.dataset.seat", "ctx.listen(gate,'change',e=>{var d=e.target.dataset,v=e.target.value;if(d.botTotal!==undefined){if(v)asyncRun(()=>service.fillBots(+v));return}if(d.botLevel!==undefined||d.botPersona!==undefined){var level=d.botLevel!==undefined;asyncRun(()=>service.configureBot(+(level?d.botLevel:d.botPersona),level?'difficulty':'persona',v));return}if(e.target.dataset.seat");
   replace("btn('comments','评论 0')+btn('lobby','游戏大厅')", "btn('comments','评论 0')+'<span data-arena-control></span>'+btn('lobby','游戏大厅')");
   replace("var cb=r.querySelector('[data-g=comments]');", "var controls=active&&service.role==='host'&&s.bots&&s.bots.length?(['end','aborted'].includes(s.phase)?btn('again','再开'):btn('end','结束')):'';uiHTML(r.querySelector('[data-arena-control]'),controls);var cb=r.querySelector('[data-g=comments]');");
+  replace(" plan(i,a){var p=this.pub,o=this.validate", " plan(i,a,preview){var p=this.pub,o=this.validate");
+  replace("'计划资源不足');list.push(o)", "'计划资源不足');if(preview)return o;list.push(o)");
   const css='<style>.arena-setup,.arena-seat-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin:3px 0}.arena-setup select,.arena-seat-tools select{width:auto;min-width:0;max-width:100%;margin:0 4px 0 0}.arena-seat-tools .gbtn{padding:2px 5px}.arena-seat-tools select{flex:1 1 48px}.arena-setup b{margin-right:7px}</style>';
   patch('</body></html>',css+'</body></html>');
   for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))new Script(match[1]);

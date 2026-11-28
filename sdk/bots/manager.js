@@ -85,8 +85,10 @@ var ArenaBots = (function() {
       if(!chosen)chosen=view.fallback||view.actions[0];
       var before=this.current(now());
       if(!before||before.key!==task.key)return;
-      var fresh=before.adapter.view(before.m,turn.id);
-      if(!fresh.actions.some(candidate=>same(chosen,candidate)))throw Error('AI 行动已失效');
+      var legal=before.adapter.legal?
+        before.adapter.legal(before.m,turn.id,chosen):
+        before.adapter.view(before.m,turn.id).actions.some(candidate=>same(chosen,candidate));
+      if(!legal)throw Error('AI 行动已失效');
       var ok=l.action(turn.id,chosen);
       if(ok===false)return;
       this.cursor=turn.index+1;
