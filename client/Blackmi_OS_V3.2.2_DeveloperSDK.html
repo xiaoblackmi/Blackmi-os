@@ -2086,6 +2086,27 @@ class KingdomMatch{
 }
 // Bundled SDK round games reuse the ordinary Lobby snapshot and action paths.
 var sdkGames=Object.create(null);
+var gameSnapshotLimit=120000; // Same JS string limit as Link.send, including the message envelope.
+class AsyncGameRuleError extends Error {}
+function ruleResult(value,method){
+ if(value&&typeof value.then==='function'){
+  Promise.resolve(value).catch(function(){});
+  throw new AsyncGameRuleError('游戏规则 '+method+' 必须同步返回');
+ }
+ return value;
+}
+function freezeGameView(value){
+ var pending=[value];
+ while(pending.length){
+  var item=pending.pop();
+  Object.freeze(item);
+  Object.keys(item).forEach(function(key){
+   var child=item[key];
+   if(child&&typeof child==='object')pending.push(child);
+  });
+ }
+ return value;
+}
 function sdkGameAction(a){
  return a&&typeof a==='object'&&!Array.isArray(a)&&
   typeof a.kind==='string'&&/^[a-z][a-z0-9-]{0,47}$/.test(a.kind)&&
@@ -2101,7 +2122,7 @@ class SdkRoundMatch {
  constructor(def,players,hostId){
   this.pub={id:uid(),kind:def.id,players:Object.freeze(players.slice()),phase:'play',rev:0,winner:null,comments:[]};
   var p=this.pub;
-  this.rules=def.createMatch(Object.freeze({
+  this.rules=ruleResult(def.createMatch(Object.freeze({
    players:p.players,
    hostId:hostId,
    finish:function(winner){
@@ -2110,7 +2131,7 @@ class SdkRoundMatch {
     p.winner=winner;
     p.phase='end';
    }
-  }));
+  })),'createMatch');
   check(this.rules&&typeof this.rules.act==='function'&&typeof this.rules.publicFor==='function'&&
     (this.rules.privateFor===undefined||typeof this.rules.privateFor==='function')&&
     (this.rules.tick===undefined||typeof this.rules.tick==='function'),'无效的游戏规则对象');
@@ -2118,21 +2139,21 @@ class SdkRoundMatch {
  publicFor(id){
   var viewer=this.pub.players.includes(id)?id:null;
   var state=copy(this.pub);
-  state.data=sdkView(this.rules.publicFor(viewer));
+  state.data=sdkView(ruleResult(this.rules.publicFor(viewer),'publicFor'));
   return state;
  }
  privateFor(id){
   if(!this.pub.players.includes(id)||!this.rules.privateFor)return {};
-  return sdkView(this.rules.privateFor(id));
+  return sdkView(ruleResult(this.rules.privateFor(id),'privateFor'));
  }
  act(id,action){
   check(this.pub.phase==='play'&&this.pub.players.includes(id)&&sdkGameAction(action),'无效游戏操作');
-  this.rules.act(id,action);
+  ruleResult(this.rules.act(id,action),'act');
   return null;
  }
  tick(){
   if(this.pub.phase!=='play'||!this.rules.tick)return false;
-  var changed=this.rules.tick(now());
+  var changed=ruleResult(this.rules.tick(now()),'tick');
   return changed===true||this.pub.phase==='end';
  }
 }
@@ -2146,9 +2167,68 @@ class Lobby {
  open(l){if(l.dead||!this.links.includes(l))return;this.stage='通道已打开，等待握手';if(this.role==='guest')l.send({v:1,t:'hello',lobby:this.lobby,token:l.token,name:this.name,lobbyRev:321});this.change()}
  send(l,t,p){return l.send(Object.assign({v:1,t:t,lobby:this.lobby},p||{}))} broadcast(t,p){this.links.slice().forEach(l=>{if(l.id&&!l.dead)this.send(l,t,p)})}
  roster(){this.broadcast('roster',{players:this.players,setup:this.setup});this.change()}
- receive(l,m){if(l.dead||!this.links.includes(l)||!m||m.v!==1||m.lobby!==this.lobby||typeof m.t!=='string')return;if(this.role==='host'){if(m.t==='hello'&&!l.id){if(m.lobbyRev!==321){this.send(l,'error',{message:'游戏大厅协议不兼容，请统一使用相同客户端版本'});return l.close('游戏大厅版本不兼容')}if(l!==this.pending||m.token!==l.token||typeof m.name!=='string'||this.players.length>=MAX)return l.close('握手无效');l.id=uid();this.players.push({id:l.id,name:m.name.trim().slice(0,24)||'玩家',ready:false});this.pending=null;this.code='';this.stage='游戏大厅在线';this.send(l,'welcome',{id:l.id,players:this.players,setup:this.setup,lobbyRev:321});this.roster();this.sync(l);return}if(!l.id)return;if(m.t==='ping'){this.send(l,'pong',{});return}if(m.t==='sync.request'){this.sync(l);return}if(m.t==='arcade.input'){if(this.match instanceof ArcadeMatch&&m.match===this.match.pub.id)this.match.input(l.id,m.input);return}if(m.t==='tank.input'){if(this.match instanceof TankArena&&m.match===this.match.pub.id)this.match.input(l.id,m.input);return}if(m.t==='seat'||m.t==='seat.ready'){try{check(this.setup&&m.setup===this.setup.id,'赛前房间已变化');if(m.t==='seat')this.assign(l.id,m.slot,l.id);else this.setReady(l.id,m.ready,m.slot)}catch(e){this.send(l,'error',{message:e.message})}return}if(m.t==='action'){try{check(this.match&&typeof m.req==='string'&&m.req.length<=64&&m.match===this.match.pub.id,'对局已变化');if(l.requests&&l.requests.includes(m.req))return;l.requests=(l.requests||[]).concat(m.req).slice(-128);this.action(l.id,m.action);this.send(l,'ack',{req:m.req})}catch(e){this.send(l,'error',{message:e.message})}return}}
- else if(this.role==='guest'){if(m.t==='welcome'&&!this.me){if(m.lobbyRev!==321){this.err('游戏大厅协议不兼容，请统一使用相同客户端版本');return l.close('游戏大厅版本不兼容')}this.me=m.id;this.players=m.players;this.setup=m.setup||null;this.pending=null;this.code='';this.stage='游戏大厅在线';this.change();return}if(!this.me){if(m.t==='error')this.err(m.message);return}if(m.t==='roster'){this.players=m.players;this.setup=m.setup||null;this.error=''}else if(m.t==='snapshot'){this.state=m.state;if(this.state&&this.state.deadline&&typeof m.hostTime==='number')this.state.deadline+=now()-m.hostTime;this.private=m.private||{};this.awaiting=false}else if(m.t==='arcade.frame'){if(!this.state||!ARCADE_KINDS.includes(this.state.kind)||this.state.kind==='kingdoms'||this.state.id!==m.match||!m.state||m.state.id!==m.match||m.state.kind!==this.state.kind||!Number.isInteger(m.state.rev)||m.state.rev<=this.state.rev)return;this.state=Object.assign({},m.state,{comments:this.state.comments||[]});}else if(m.t==='tank.frame'){if(!this.state||this.state.kind!=='tank'||this.state.id!==m.match||!Number.isInteger(m.rev)||m.rev<=this.state.rev)return;this.state=Object.assign({},this.state,{rev:m.rev,tanks:m.tanks,bullets:m.bullets,walls:m.walls,left:m.left});}else if(m.t==='delta'&&this.state&&m.match===this.state.id&&m.rev===this.state.rev+1){var a=m.delta,s=this.state.strokes[this.state.strokes.length-1];if(!s||s.sid!==a.sid){s={sid:a.sid,color:a.color,width:a.width,points:[]};this.state.strokes.push(s);this.state.redo=0}s.points.push.apply(s.points,a.points);this.state.rev=m.rev}else if(m.t==='delta'){this.send(l,'sync.request',{})}else if(m.t==='ack'){this.awaiting=false}else if(m.t==='error'){this.awaiting=false;this.error=String(m.message)}else if(m.t==='pong')return;this.change()}}
- sync(l){if(l)this.send(l,'snapshot',{state:this.match?((this.match instanceof ArcadeMatch||this.match instanceof KingdomMatch||this.match instanceof SdkRoundMatch)?this.match.publicFor(l.id):this.match.pub):null,private:this.match?this.match.privateFor(l.id):{},hostTime:now()});else{this.state=this.match?((this.match instanceof ArcadeMatch||this.match instanceof KingdomMatch||this.match instanceof SdkRoundMatch)?this.match.publicFor(this.me):copy(this.match.pub)):null;this.private=this.match?this.match.privateFor(this.me):{};this.links.slice().forEach(q=>{if(q.id)this.sync(q)});this.change()}}
+ receive(l,m){if(l.dead||!this.links.includes(l)||!m||m.v!==1||m.lobby!==this.lobby||typeof m.t!=='string')return;if(this.role==='host'){if(m.t==='hello'&&!l.id){if(m.lobbyRev!==321){this.send(l,'error',{message:'游戏大厅协议不兼容，请统一使用相同客户端版本'});return l.close('游戏大厅版本不兼容')}if(l!==this.pending||m.token!==l.token||typeof m.name!=='string'||this.players.length>=MAX)return l.close('握手无效');l.id=uid();this.players.push({id:l.id,name:m.name.trim().slice(0,24)||'玩家',ready:false});this.pending=null;this.code='';this.stage='游戏大厅在线';this.send(l,'welcome',{id:l.id,players:this.players,setup:this.setup,lobbyRev:321});this.roster();this.sync(l);return}if(!l.id)return;if(m.t==='ping'){this.send(l,'pong',{});return}if(m.t==='sync.request'){this.sync(l);return}if(m.t==='arcade.input'){if(this.match instanceof ArcadeMatch&&m.match===this.match.pub.id)this.match.input(l.id,m.input);return}if(m.t==='tank.input'){if(this.match instanceof TankArena&&m.match===this.match.pub.id)this.match.input(l.id,m.input);return}if(m.t==='seat'||m.t==='seat.ready'){try{check(this.setup&&m.setup===this.setup.id,'赛前房间已变化');if(m.t==='seat')this.assign(l.id,m.slot,l.id);else this.setReady(l.id,m.ready,m.slot)}catch(e){this.send(l,'error',{message:e.message})}return}if(m.t==='action'){try{check(this.match&&typeof m.req==='string'&&m.req.length<=64&&m.match===this.match.pub.id,'对局已变化');if(l.requests&&l.requests.includes(m.req))return;l.requests=(l.requests||[]).concat(m.req).slice(-128);if(this.action(l.id,m.action)!==false)this.send(l,'ack',{req:m.req})}catch(e){this.send(l,'error',{message:e.message})}return}}
+ else if(this.role==='guest'){if(m.t==='welcome'&&!this.me){if(m.lobbyRev!==321){this.err('游戏大厅协议不兼容，请统一使用相同客户端版本');return l.close('游戏大厅版本不兼容')}this.me=m.id;this.players=m.players;this.setup=m.setup||null;this.pending=null;this.code='';this.stage='游戏大厅在线';this.change();return}if(!this.me){if(m.t==='error')this.err(m.message);return}if(m.t==='roster'){this.players=m.players;this.setup=m.setup||null;if(this.setup||this.state)this.error=''}else if(m.t==='snapshot'){if(m.state&&m.state.deadline&&typeof m.hostTime==='number')m.state.deadline+=now()-m.hostTime;this.setSnapshot(m.state,m.private||{});this.awaiting=false}else if(m.t==='arcade.frame'){if(!this.state||!ARCADE_KINDS.includes(this.state.kind)||this.state.kind==='kingdoms'||this.state.id!==m.match||!m.state||m.state.id!==m.match||m.state.kind!==this.state.kind||!Number.isInteger(m.state.rev)||m.state.rev<=this.state.rev)return;this.state=Object.assign({},m.state,{comments:this.state.comments||[]});}else if(m.t==='tank.frame'){if(!this.state||this.state.kind!=='tank'||this.state.id!==m.match||!Number.isInteger(m.rev)||m.rev<=this.state.rev)return;this.state=Object.assign({},this.state,{rev:m.rev,tanks:m.tanks,bullets:m.bullets,walls:m.walls,left:m.left});}else if(m.t==='delta'&&this.state&&m.match===this.state.id&&m.rev===this.state.rev+1){var a=m.delta,s=this.state.strokes[this.state.strokes.length-1];if(!s||s.sid!==a.sid){s={sid:a.sid,color:a.color,width:a.width,points:[]};this.state.strokes.push(s);this.state.redo=0}s.points.push.apply(s.points,a.points);this.state.rev=m.rev}else if(m.t==='delta'){this.send(l,'sync.request',{})}else if(m.t==='ack'){this.awaiting=false}else if(m.t==='error'){this.awaiting=false;this.error=String(m.message)}else if(m.t==='pong')return;this.change()}}
+ setSnapshot(state,privateState){
+  var sdk=state&&sdkGames[state.kind];
+  this.state=sdk?freezeGameView(state):state;
+  this.private=sdk?freezeGameView(privateState):privateState;
+ }
+ snapshot(id,time,local){
+  var m=this.match,projected=m instanceof ArcadeMatch||m instanceof KingdomMatch||m instanceof SdkRoundMatch;
+  return {v:1,t:'snapshot',lobby:this.lobby,state:m?(projected?m.publicFor(id):local?copy(m.pub):m.pub):null,
+    private:m?m.privateFor(id):{},hostTime:time};
+ }
+ sendSnapshot(link,packet){
+  try{return !link.dead&&link.send(packet)&&!link.dead}
+  catch(e){return false}
+ }
+ failMatch(message){
+  this.match=null;this.setup=null;this.setSnapshot(null,{});this.awaiting=false;
+  this.error=message;this.note(message);
+  var reset=this.snapshot(null,now(),false);
+  this.sendingSnapshots=true;
+  try{
+   for(var link of this.links.slice()){
+    if(link.id&&!link.dead&&!this.sendSnapshot(link,reset))link.close('无法恢复游戏同步');
+   }
+  }finally{this.sendingSnapshots=false}
+  // The existing roster handler clears errors, so the diagnosis must follow it.
+  this.roster();
+  this.broadcast('error',{message:message});
+  return false;
+ }
+ sync(l){
+  if(l&&l.dead)return false;
+  var match=this.match,time=now(),local=null,packets=[],tooLarge=false;
+  var recipients=l?[l]:this.links.filter(link=>link.id&&!link.dead);
+  try{
+   if(!l)local=this.snapshot(this.me,time,true);
+   for(var link of recipients){
+    var packet=this.snapshot(link.id,time,false);
+    if(JSON.stringify(packet).length>gameSnapshotLimit){tooLarge=true;break}
+    packets.push({link:link,packet:packet});
+   }
+   if(!tooLarge&&local)tooLarge=JSON.stringify(local).length>gameSnapshotLimit;
+  }catch(e){
+   return this.failMatch('游戏快照投影或序列化失败，已结束对局');
+  }
+  if(tooLarge)return this.failMatch('游戏快照超过 120000 字符，已结束对局');
+
+  var failed=[];
+  this.sendingSnapshots=true;
+  try{
+   for(var entry of packets){
+    if(this.sendSnapshot(entry.link,entry.packet))continue;
+    failed.push(entry.link);
+    if(match)break;
+   }
+  }finally{this.sendingSnapshots=false}
+  if(failed.length&&match)return this.failMatch('游戏快照发送失败，已结束对局');
+  for(var link of failed)if(!link.dead)link.close('无法恢复游戏同步');
+  if(local){this.setSnapshot(local.state,local.private);this.change()}
+  return failed.length===0;
+ }
  idle(){return !this.match||['end','aborted'].includes(this.match.pub.phase)}
  prepare(kind){check(this.role==='host'&&this.idle(),'请先结束当前对局');check(Object.prototype.hasOwnProperty.call(titles,kind),'游戏无效');this.setup={id:uid(),kind:kind,seats:Array(maxPlayers(kind)).fill(null),ready:[]};this.error='';this.roster()}
  cancelSetup(){check(this.role==='host'&&this.idle(),'只有房主可以取消准备');this.setup=null;this.error='';this.roster()}
@@ -2160,15 +2240,31 @@ class Lobby {
  ready(v){check(this.setup&&this.me,'请先入座');var slot=this.setup.seats.indexOf(this.me);check(slot>=0,'请先入座');this.error='';if(this.role==='host')this.setReady(this.me,v,slot);else check(this.send(this.links[0],'seat.ready',{setup:this.setup.id,slot:slot,ready:v}),'发送失败')}
  start(kind){check(this.role==='host'&&this.idle(),'已有对局');var p=this.setup;check(p&&p.kind===kind,'请先选择参赛座位');var players=p.seats.filter(x=>x!==null);check(players.length>=minPlayers(kind)&&players.length<=maxPlayers(kind)&&(kind!=='football'||players.length%2===0),'参赛人数不符合规则');check(new Set(players).size===players.length&&players.every(id=>this.players.some(x=>x.id===id)&&p.ready.includes(id)),'等待全部参赛者准备');this.match=sdkGames[kind]?new SdkRoundMatch(sdkGames[kind],players,this.me):kind==='holdem'?new Holdem(players):kind==='xiangqi'?new Xiangqi(players):kind==='eightball'?new EightBall(players):kind==='telephone'?new Telephone(players,creativeSettings.telephone,this.me):kind==='undercover'?new Undercover(players):kind==='uno'?new Uno(players):kind==='tank'?new TankArena(players):kind==='kingdoms'?new KingdomMatch(players):ARCADE_KINDS.includes(kind)?new ArcadeMatch(kind,players):new Match(kind,players,kind==='draw-guess'?creativeSettings[kind]:undefined);this.match.pub.comments=[];this.setup=null;this.error='';this.roster();this.sync()}
  end(){check(this.role==='host','只有房主能结束');this.match=null;this.setup=null;this.roster();this.sync()}
- action(id,a){check(this.match,'无对局');if(a&&a.kind==='comment'){var p=this.players.find(x=>x.id===id),m=this.match.pub;check(p&&typeof a.text==='string'&&a.text.trim().length>0&&a.text.length<=120,'评论无效');this.commentTimes=this.commentTimes||{};check(!this.commentTimes[id]||now()-this.commentTimes[id]>=800,'评论太快');this.commentTimes[id]=now();m.comments=(m.comments||[]).concat({id:id,name:p.name,text:a.text.trim(),time:now(),spectator:!m.players.includes(id)}).slice(-30);m.rev++;this.sync();return}check(this.match.pub.players.includes(id)||(this.match.pub.kind==='telephone'&&id===this.me&&a&&a.kind==='reveal'),'观战者不能操作');var d=this.match.act(id,a);this.match.pub.rev++;if(d){this.state=copy(this.match.pub);this.private=this.match.privateFor(this.me);this.broadcast('delta',{match:this.state.id,rev:this.state.rev,delta:d});this.change()}else this.sync()}
+ action(id,a){check(this.match,'无对局');if(a&&a.kind==='comment'){var p=this.players.find(x=>x.id===id),m=this.match.pub;check(p&&typeof a.text==='string'&&a.text.trim().length>0&&a.text.length<=120,'评论无效');this.commentTimes=this.commentTimes||{};check(!this.commentTimes[id]||now()-this.commentTimes[id]>=800,'评论太快');this.commentTimes[id]=now();m.comments=(m.comments||[]).concat({id:id,name:p.name,text:a.text.trim(),time:now(),spectator:!m.players.includes(id)}).slice(-30);m.rev++;return this.sync()}check(this.match.pub.players.includes(id)||(this.match.pub.kind==='telephone'&&id===this.me&&a&&a.kind==='reveal'),'观战者不能操作');var d;
+  try{d=this.match.act(id,a)}
+  catch(e){if(e instanceof AsyncGameRuleError)return this.failMatch(e.message+'，已结束对局');throw e}
+  this.match.pub.rev++;if(d){this.state=copy(this.match.pub);this.private=this.match.privateFor(this.me);this.broadcast('delta',{match:this.state.id,rev:this.state.rev,delta:d});this.change()}else return this.sync()}
  act(a){this.error='';try{if(this.role==='host')this.action(this.me,a);else{check(this.me&&this.state&&this.links[0],'尚未连接');var stroke=a.kind==='stroke';if(!stroke)check(!this.awaiting,'等待房主确认');check(this.send(this.links[0],'action',{match:this.state.id,req:uid(),action:a}),'发送失败');if(!stroke){this.awaiting=true;this.lastSent=now()}this.change()}}catch(e){this.err(e.message)}}
- drop(l,why){if(this.resetting)return;this.links=this.links.filter(x=>x!==l);if(this.pending===l){this.pending=null;this.code='';this.stage='配对未完成：'+(why||'连接结束')}this.note(why||'连接结束');if(this.role==='guest'){this.stage='房主连接已断开';if(this.state)this.state.phase='aborted';this.me=null;this.setup=null;this.private={};this.awaiting=false}else if(l.id){this.players=this.players.filter(p=>p.id!==l.id);if(this.setup){this.setup.seats=this.setup.seats.map(id=>id===l.id?null:id);this.setup.ready=this.setup.ready.filter(id=>id!==l.id)}if(this.match&&this.match.pub.players.includes(l.id)&&!['end','aborted'].includes(this.match.pub.phase)){this.match.pub.phase='aborted';this.match.pub.rev++;this.sync()}this.roster()}this.change()}
+ drop(l,why){if(this.resetting)return;this.links=this.links.filter(x=>x!==l);if(this.pending===l){this.pending=null;this.code='';this.stage='配对未完成：'+(why||'连接结束')}this.note(why||'连接结束');if(this.role==='guest'){this.stage='房主连接已断开';this.setSnapshot(this.state?Object.assign({},this.state,{phase:'aborted'}):null,{});this.me=null;this.setup=null;this.awaiting=false}else if(l.id){this.players=this.players.filter(p=>p.id!==l.id);if(this.setup){this.setup.seats=this.setup.seats.map(id=>id===l.id?null:id);this.setup.ready=this.setup.ready.filter(id=>id!==l.id)}if(this.sendingSnapshots)return;if(this.match&&this.match.pub.players.includes(l.id)&&!['end','aborted'].includes(this.match.pub.phase)){this.match.pub.phase='aborted';this.match.pub.rev++;if(!this.sync())return}this.roster()}this.change()}
  leave(){this.generation++;this.resetting=true;this.links.slice().forEach(l=>{try{l.close('退出大厅')}catch(e){this.note('关闭连接异常：'+e.message)}});this.resetting=false;this.role='';this.me=null;this.lobby=null;this.setup=null;this.players=[];this.links=[];this.pending=null;this.match=null;this.state=null;this.private={};this.code='';this.parts=null;this.stage='未连接';this.awaiting=false;this.error='';this.lastSent=0;this.note('已退出游戏大厅');this.change()}
  arcadeInput(input){if(!this.state||!ARCADE_KINDS.includes(this.state.kind)||this.state.kind==='kingdoms'||this.state.phase!=='play'||!this.state.players.includes(this.me))return;if(this.role==='host'){if(this.match instanceof ArcadeMatch)this.match.input(this.me,input)}else{var l=this.links[0];if(l&&!l.dead&&l.queueSize<12000&&(!l.dc||l.dc.bufferedAmount<24000))this.send(l,'arcade.input',{match:this.state.id,input:input})}}
  arcadeStep(){var m=this.match;if(this.role!=='host'||!(m instanceof ArcadeMatch)||m.pub.phase!=='play'||!m.step())return;m.pub.rev++;if(m.pub.phase!=='play'){this.sync();return}var p=m.pub;this.state=m.publicFor(this.me);this.private={};this.links.slice().forEach(l=>{if(l.id&&!l.dead&&l.queueSize<12000&&(!l.dc||l.dc.bufferedAmount<24000)){var v=m.publicFor(l.id);delete v.comments;this.send(l,'arcade.frame',{match:p.id,state:v})}});this.change()}
  tankInput(input){if(!this.state||this.state.kind!=='tank'||this.state.phase!=='play'||!this.state.players.includes(this.me))return;if(this.role==='host'){if(this.match instanceof TankArena)this.match.input(this.me,input)}else{var l=this.links[0];if(l&&!l.dead&&l.queueSize<12000)this.send(l,'tank.input',{match:this.state.id,input:input})}}
  tankStep(){var m=this.match;if(this.role!=='host'||!(m instanceof TankArena)||m.pub.phase!=='play')return;if(!m.step())return;m.pub.rev++;if(m.pub.phase!=='play'){this.sync();return}var p=m.pub;this.state=copy(p);this.private={};var f={match:p.id,rev:p.rev,tanks:p.tanks.map(v=>v.map((x,i)=>i<4?Math.round(x*100)/100:x)),bullets:p.bullets,walls:p.walls,left:p.left};this.links.slice().forEach(l=>{if(l.id&&!l.dead&&l.queueSize<12000&&(!l.dc||l.dc.bufferedAmount<24000))this.send(l,'tank.frame',f)});this.change()}
- tick(){if(this.match&&this.match.tick()){this.match.pub.rev++;this.sync()}var t=now();this.links.slice().forEach(l=>{l.flush();if(l.opened&&t-l.last>45000)l.close('心跳超时');else if(!l.opened&&t-l.started>180000)l.close('DataChannel 等待超时；ICE='+l.pc.iceConnectionState+'，信令='+l.pc.signalingState);else if(l.opened&&this.role==='guest'&&t-(l.lastPing||0)>5000){l.lastPing=t;this.send(l,'ping',{})} });if(this.awaiting&&t-this.lastSent>10000){this.awaiting=false;this.err('操作确认超时')}}
+ tick(){
+  try{if(this.match&&this.match.tick()){this.match.pub.rev++;this.sync()}}
+  catch(e){this.failMatch((e instanceof AsyncGameRuleError?e.message:'游戏规则计时失败')+'，已结束对局')}
+  finally{
+   var t=now();
+   this.links.slice().forEach(l=>{
+    l.flush();
+    if(l.opened&&t-l.last>45000)l.close('心跳超时');
+    else if(!l.opened&&t-l.started>180000)l.close('DataChannel 等待超时；ICE='+l.pc.iceConnectionState+'，信令='+l.pc.signalingState);
+    else if(l.opened&&this.role==='guest'&&t-(l.lastPing||0)>5000){l.lastPing=t;this.send(l,'ping',{})}
+   });
+   if(this.awaiting&&t-this.lastSent>10000){this.awaiting=false;this.err('操作确认超时')}
+  }
+ }
 }
 var service=new Lobby(),previousMatchKind=null;service.on(()=>{var k=service.state&&service.state.kind;if(previousMatchKind&&previousMatchKind!==k){var old=previousMatchKind;previousMatchKind=k;root.BlackmiApps.close(old);}else previousMatchKind=k;});setInterval(()=>service.tick(),500);setInterval(()=>service.tankStep(),50);setInterval(()=>service.arcadeStep(),50);root.BlackmiGameLink=Object.freeze({status:()=>({role:service.role,stage:service.stage,count:service.players.length,match:service.state&&service.state.kind}),diagnostics:()=>service.log.slice()});
 // UI helpers and app registration below.
@@ -2220,6 +2316,10 @@ function registerRoundGame(def){
  sdkGames[info.id]=info;
  return info.id;
 }
+function lobbyGameEntry(kind,label){
+ return Object.prototype.hasOwnProperty.call(titles,kind)?btn('open:'+kind,label,'gprimary'):
+  '<small>本机缺少此游戏模块，请使用与房主相同的打包 HTML</small>';
+}
 function gameCards(){
  var marks=['● ○ ●','✎','♠ ♥ ♣','A ♠','楚河','⑧','✎ → ?','◈','UNO','▣','⚽','◎','♜','✦'];
  var labels=['2人 · 回合制','3–8人 · 绘画','3人 · 纸牌','2–8人 · 虚拟积分','2人 · 象棋','2人 · 台球','4–8人 · 传话','4–8人 · 推理','2–8人 · 彩色纸牌','2–8人 · 实时竞技','2/4/6/8人 · 团队','4–8人 · 躲藏','2–8人 · 战略','2–8人 · 合作'];
@@ -2233,7 +2333,7 @@ function gameConfirm(message,action){var doc=root.document,previous=doc.getEleme
 function register(def){root.BlackmiApps.register(def)}
 register({id:'game-center',name:'游戏中心',en:'Game Center',icon:'apps',color:'#7858c4',desktop:true,mount:function(ctx){var r=ctx.root;r.innerHTML='<div class="game27 globby"><div class="gintro"><div><small>BLACKMI PLAY · LOCAL</small><h2>游戏大厅</h2><p>一次配对，多款游戏。聊天连接不受影响。</p></div><span class="gmark">'+Object.keys(titles).length+'</span></div><div class="gmain"><section class="gpanel gpair"><h3>联机连接</h3><input data-nick maxlength="24" placeholder="你的游戏昵称" value="玩家"><div data-connect></div><div data-code></div><input data-file type="file" accept="image/*" style="display:none"><textarea data-manual placeholder="也可粘贴完整游戏连接码" rows="2"></textarea><div class="gactions">'+btn('import','导入连接码')+btn('scan','拍照识别')+btn('reset-scan','重置分片')+'</div><details><summary>连接诊断</summary><pre data-log></pre></details></section><section class="gpanel"><h3>房间成员</h3><div data-roster></div><div data-status class="gsub"></div><div data-match></div><div class="gcovers">'+gameCards()+'</div><p class="gsub">先选择游戏，再自主入座或观战。房主可指定座位；全员准备后开局。</p></section></div></div>';var q=x=>r.querySelector(x),frame=0,oldCode='',codeFrames=[];
  function put(selector,html){var el=q(selector);if(el._bmHtml!==html){el._bmHtml=html;el.innerHTML=html;}}
- function render(){var p=service.players.find(x=>x.id===service.me);uiText(q('[data-status]'),service.stage+' · '+service.players.length+'/8'+(service.error?' · '+displayGameError(service.error):''));put('[data-connect]',service.role?(btn('leave','退出大厅','',false)+(service.role==='host'?btn('offer',service.pending?'等待配对':'生成邀请','gprimary',!!service.pending||service.players.length>=8):'')+(service.pending?btn('cancel','取消配对'):'')):btn('create','创建游戏大厅','gprimary'));put('[data-roster]',service.players.map((x,i)=>'<div class="grow"><span class="gavatar">'+esc(x.name.slice(0,1))+'</span><b>'+esc(x.name)+(x.id===service.me?'（我）':'')+'</b><small>'+((i===0?'房主 · ':'')+(service.setup?(service.setup.seats.includes(x.id)?service.setup.ready.includes(x.id)?'已准备':'已入座':'观战者'):service.state?(service.state.players.includes(x.id)?'对局玩家':'观战者'):'在线'))+'</small></div>').join('')||'<p class="gsub">尚未加入游戏大厅</p>');var m=service.state;put('[data-match]',service.setup?'<div class="gcurrent"><b>'+esc(titles[service.setup.kind])+'</b> · 赛前准备 '+service.setup.seats.filter(Boolean).length+'/'+service.setup.seats.length+' '+btn('open:'+service.setup.kind,'进入准备','gprimary')+'</div>':m?'<div class="gcurrent"><b>'+esc(titles[m.kind])+'</b> · '+(['end','aborted'].includes(m.phase)?'已结束':m.phase==='review'?'本手已结算':'对局进行中')+' '+btn('open:'+m.kind,m.players.includes(service.me)?'进入对局':'进入观战','gprimary')+' <small>'+service.players.filter(x=>!m.players.includes(x.id)).length+' 人观战</small>'+(service.role==='host'?btn('end','结束对局'):'')+'</div>':'');if(q('[data-log]').parentElement.open)uiText(q('[data-log]'),displayGameError(service.log.join('\n')));if(oldCode!==service.code){oldCode=service.code;frame=0;codeFrames=oldCode?frames(oldCode):[];paintQR()}}
+ function render(){var p=service.players.find(x=>x.id===service.me);uiText(q('[data-status]'),service.stage+' · '+service.players.length+'/8'+(service.error?' · '+displayGameError(service.error):''));put('[data-connect]',service.role?(btn('leave','退出大厅','',false)+(service.role==='host'?btn('offer',service.pending?'等待配对':'生成邀请','gprimary',!!service.pending||service.players.length>=8):'')+(service.pending?btn('cancel','取消配对'):'')):btn('create','创建游戏大厅','gprimary'));put('[data-roster]',service.players.map((x,i)=>'<div class="grow"><span class="gavatar">'+esc(x.name.slice(0,1))+'</span><b>'+esc(x.name)+(x.id===service.me?'（我）':'')+'</b><small>'+((i===0?'房主 · ':'')+(service.setup?(service.setup.seats.includes(x.id)?service.setup.ready.includes(x.id)?'已准备':'已入座':'观战者'):service.state?(service.state.players.includes(x.id)?'对局玩家':'观战者'):'在线'))+'</small></div>').join('')||'<p class="gsub">尚未加入游戏大厅</p>');var m=service.state;put('[data-match]',service.setup?'<div class="gcurrent"><b>'+(esc(titles[service.setup.kind])||'未知游戏')+'</b> · 赛前准备 '+service.setup.seats.filter(Boolean).length+'/'+service.setup.seats.length+' '+lobbyGameEntry(service.setup.kind,'进入准备')+'</div>':m?'<div class="gcurrent"><b>'+(esc(titles[m.kind])||'未知游戏')+'</b> · '+(['end','aborted'].includes(m.phase)?'已结束':m.phase==='review'?'本手已结算':'对局进行中')+' '+lobbyGameEntry(m.kind,m.players.includes(service.me)?'进入对局':'进入观战')+' <small>'+service.players.filter(x=>!m.players.includes(x.id)).length+' 人观战</small>'+(service.role==='host'?btn('end','结束对局'):'')+'</div>':'');if(q('[data-log]').parentElement.open)uiText(q('[data-log]'),displayGameError(service.log.join('\n')));if(oldCode!==service.code){oldCode=service.code;frame=0;codeFrames=oldCode?frames(oldCode):[];paintQR()}}
  function paintQR(){var c=q('[data-code]');if(!codeFrames.length){c.innerHTML='';return}c.innerHTML='<div class="gqr"><canvas></canvas><div><b>'+(service.role==='host'?'邀请二维码':'应答二维码')+'</b><p>第 '+(frame+1)+' / '+codeFrames.length+' 张</p>'+btn('prev','上一张')+btn('next','下一张')+'<details><summary>完整连接码</summary><textarea readonly></textarea></details></div></div>';codec.PadQR.encode(codeFrames[frame],c.querySelector('canvas'));c.querySelector('textarea').value=service.code}
  ctx.listen(r,'click',e=>{var b=e.target.closest('[data-g]');if(!b)return;var a=b.dataset.g,n=q('[data-nick]').value;if(a==='create')asyncRun(()=>service.create(n));else if(a==='offer')asyncRun(()=>service.offer());else if(a==='leave'){var exit=()=>{service.leave();q('[data-manual]').value=''};if(service.state&&!['end','aborted','review'].includes(service.state.phase))gameConfirm('退出游戏大厅？当前对局会中止。',exit);else exit()}else if(a==='cancel'){if(service.role==='guest'){service.leave();q('[data-manual]').value=''}else if(service.pending){service.generation++;service.pending.close('配对已取消');service.parts=null;service.error='';service.change()}}else if(a==='import')asyncRun(()=>service.importCode(q('[data-manual]').value,n));else if(a==='scan')q('[data-file]').click();else if(a==='reset-scan'){service.parts=null;service.stage='扫描分片已清除';service.change()}else if(a==='prev'||a==='next'){frame=(frame+codeFrames.length+(a==='next'?1:-1))%codeFrames.length;paintQR()}else if(a==='end'){gameConfirm('结束当前对局？',()=>service.end())}else if(a.indexOf('open:')===0){var k=a.slice(5);if(service.role==='host'&&service.idle()&&!service.setup&&!(service.state&&service.state.kind===k))service.prepare(k);root.BlackmiApps.launch(k)}});ctx.listen(q('[data-file]'),'change',e=>{var f=e.target.files[0];e.target.value='';if(f)asyncRun(()=>service.scan(f,q('[data-nick]').value))});ctx.listen(q('[data-log]').parentElement,'toggle',()=>{if(ctx.isActive())render()});ctx.cleanup(service.on(()=>{if(ctx.isActive())render()}));render();return {activate:render}}});
 function canvasInsets(cv){var s=getComputedStyle(cv),n=k=>parseFloat(s[k])||0;return {l:n('borderLeftWidth')+n('paddingLeft'),r:n('borderRightWidth')+n('paddingRight'),t:n('borderTopWidth')+n('paddingTop'),b:n('borderBottomWidth')+n('paddingBottom'),box:s.boxSizing};}

@@ -15,6 +15,8 @@ node --test tests/developer-sdk.test.cjs
 
 打包输入是受信任的普通 JS 脚本。需要多个文件时可先内嵌规则，再内嵌注册代码。Node 和类型工具仅用于开发。模块跟随 HTML 启动，资源内嵌，不使用 CDN、运行时模块加载或远程插件。
 
+大厅在准备或观战入口发现本机缺少当前模块时，会提示使用与房主相同的打包 HTML。大厅握手不包含模块版本。同一 ID 的不同实现无法靠握手区分，联机前请分发同一文件或比较 SHA-256。
+
 ## 本地应用
 
 | API | 用途 |
@@ -49,10 +51,17 @@ node --test tests/developer-sdk.test.cjs
 - 可选 `privateFor(playerId)` 返回该玩家自己的 JSON 对象。观战者自动收到空对象。隐藏身份、手牌、秘密指令放这里，或只在该玩家的公共投影中暴露其允许看到的内容。投影函数应无副作用。
 - 可选 `tick(now)` 接受房主时间戳，由既有 Lobby 约每 500ms 调用。发生需要同步的变化时返回 `true`。操作或计时规则可用 `finish(winnerId)` 结束，平局传 `null`。
 - 动作与投影使用 JSON 值。动作 `kind` 由小写字母开头，允许小写字母、数字和连字符，最多 48 字符。`comment` 和 `stroke` 由既有引擎保留。客户端传来的字段按未知值做类型、边界和范围校验。
+- `createMatch`、`act`、`tick` 和投影回调必须同步返回。SDK 会拒绝 Promise 或 thenable。工厂失败保留准备状态，在对局中发现异步返回或计时异常会结束故障对局。
+
+### 快照与故障恢复
+
+Lobby 逐接收者构建并校验整批快照，完成校验后才派发。单条消息以 JSON 序列化后的 **120,000 个 JS 字符**为上限，包含协议外壳、公共投影、私有投影、时间和评论。正常开发仍按约 **16 KiB** 的软预算控制快照。
+
+投影、序列化、长度检查或快照入队失败时，房主结束该局，清空准备状态、对局和私有状态，向可用连接发送空快照及原因。已收到部分更新的客户端也会清空对局。接收不了重置包的连接会断开，其余成员留在大厅，可以重新开局。失败动作不会收到成功 ACK。成功 ACK 表示该批快照已获现有发送路径接受，实际到达仍取决于连接。
 
 ### 客户端界面
 
-`mount(ctx,play,game)` 在 `play` 容器建立对局内容，返回 `render(state,privateState)`。可选 `pause()`、`reset()`。按只读快照更新 UI，不在画面里算权威状态。SDK 提供 `state.id`、`kind`、`players`、`phase`（`play`、`end`、`aborted`）、`rev`、`winner`、`comments` 和 `data`。
+`mount(ctx,play,game)` 在 `play` 容器建立对局内容，返回 `render(state,privateState)`。可选 `pause()`、`reset()`。SDK 的公共和私有 UI 快照在安装时递归冻结。需要排序、标记或编辑时请复制数据。SDK 提供 `state.id`、`kind`、`players`、`phase`（`play`、`end`、`aborted`）、`rev`、`winner`、`comments` 和 `data`。
 
 - `game.status()` 给出 `playerId`、`role`、`canAct` 和 `pending`。`canAct` 表示前台、已入座且可提交，当前轮次和动作是否合法仍由规则判断。
 - `game.submit(state.id,action)` 走既有动作、快照和 ACK。返回 `false` 表示本地拦截或提交失败，返回 `true` 表示房主已接受或成员请求已排队。成员以新快照、ACK 和大厅提示确认结果。
