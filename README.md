@@ -4,13 +4,14 @@
 
 **一个 HTML 文件，一张局域网，一个属于自己的多人应用空间。**
 
-![Version](https://img.shields.io/badge/Version-3.2.1%20Kingdoms%20Reborn-3478ED?style=flat-square)
-![HTML](https://img.shields.io/badge/Single%20HTML-544%20KiB-526B91?style=flat-square)
-![Games](https://img.shields.io/badge/Games-14-269579?style=flat-square)
+![Version](https://img.shields.io/badge/Version-3.4%20AI%20Arena%20RC2-3478ED?style=flat-square)
+![HTML](https://img.shields.io/badge/Single%20HTML-661%20KiB-526B91?style=flat-square)
+![Games](https://img.shields.io/badge/Games-15-269579?style=flat-square)
 ![Players](https://img.shields.io/badge/Lobby-Up%20to%208-8066B5?style=flat-square)
-![Status](https://img.shields.io/badge/Status-Development-E0A34C?style=flat-square)
+![AI](https://img.shields.io/badge/Offline%20AI-5%20Games-269579?style=flat-square)
+![Status](https://img.shields.io/badge/Status-RC2%20on%20main-3478ED?style=flat-square)
 
-### [⬇️ 下载新版 ZIP](https://github.com/xiaoblackmi/Blackmi-os/archive/0e6090a10289a7a83666e0789f66ab4376ce54f2.zip) · [📖 查看源码](client/Blackmi_OS_V3.2.1_Kingdoms.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
+### [⬇️ 下载最新版 ZIP](https://github.com/xiaoblackmi/Blackmi-os/archive/refs/heads/main.zip) · [单 HTML](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V3.4_AI_Arena_RC2.html) · [📖 查看源码](client/Blackmi_OS_V3.4_AI_Arena_RC2.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
 
 *Local-first communication, applications and multiplayer games.*
 
@@ -22,7 +23,7 @@
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
 >
-> 当前 main 分支 V3.2.1 Kingdoms Reborn 为开发候选版，优先适配 834×360 超宽屏 WebView。上图为 V3.1.2 历史客户端截图，并非新版实机验收。游戏大厅协议 321，参与者必须统一版本。
+> 当前 main 分支最新版为 V3.4 AI Arena RC2（2026-11-28 合并发布；代码复审通过，目标 PAD 实机验收待完成），优先适配 834×360 超宽屏 WebView。上图为 V3.1.2 历史客户端截图，并非新版实机验收。游戏大厅协议 321，参与者必须统一版本。
 
 ---
 
@@ -30,15 +31,20 @@
 
 [界面展示](#-界面实录--screenshots) · [功能介绍](#-你可以做什么) · [快速上手](#-快速上手) · [游戏图鉴](#-游戏图鉴) · [技术架构](#-技术架构) · [版本与验收](#-版本与验收)
 
-## V3.4 · AI Arena RC2 开发候选
+## 🆕 V3.4 · AI Arena RC2
 
-[下载 V3.4 RC2 单 HTML](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/feature/3.4-ai-arena/client/Blackmi_OS_V3.4_AI_Arena_RC2.html) · [RC1 历史构建](client/Blackmi_OS_V3.4_AI_Arena.html) · [人机使用与开发指南](sdk/bots/README.md) · [测试结果](TESTING.md#v34-ai-arena-rc2)
+[下载 V3.4 RC2 单 HTML](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V3.4_AI_Arena_RC2.html) · [RC1 历史构建](client/Blackmi_OS_V3.4_AI_Arena.html) · [人机使用与开发指南](sdk/bots/README.md) · [测试结果](TESTING.md#v34-ai-arena-rc2)
 
 五子棋、UNO、汉末·逐鹿、德州扑克和王国争霸支持单人离线和真人与 AI 混桌。游戏中心内选择「单机人机」可直接开始。混桌使用同版 V3.4 客户端，由房主在赛前准备页增加或补足 AI，真人按正常流程就座和准备。德州积分仅供游戏内娱乐。
 
-V3.4 在独立开发分支等待审查。C6 / WPS WebView 实机单机及跨设备组局待验收。上方 main 下载入口仍对应 V3.2.1。
+- 统一 Bot Manager：虚拟座位独立于真实连接，支持简单/普通难度，德州与王国另有性格选项。
+- 五子棋新增有界威胁搜索；王国新增影子规划、兵营建设及有限战略记忆。
+- 15 款游戏保留全真人模式；通信冻结区域、历史 HTML 和权威规则保留。
+- RC2 已随 [PR #2](https://github.com/xiaoblackmi/Blackmi-os/pull/2)、[PR #3](https://github.com/xiaoblackmi/Blackmi-os/pull/3)、[PR #4](https://github.com/xiaoblackmi/Blackmi-os/pull/4) 依次合入 main。开发者报告 86/86 自动化测试及 Chromium 80 双视口通过；独立复审通过可复现构建、11 项区域比对、30 局王国与 32 局五子棋对抗（16,013 次策略决策）。真实 RTC 测试仍止于 ICE 收集超时，C6 / WPS 实机单机、混桌及长时性能待验收。
 
-## 🆕 V3.2.1 · Kingdoms Reborn
+**iPad 下载提示：** 优先下载 ZIP 并在「文件」App 解压；Raw 链接可能显示为纯文本。解压后进入 `client`，找到 `Blackmi_OS_V3.4_AI_Arena_RC2.html`。
+
+## 历史版本 · V3.2.1 Kingdoms Reborn
 
 - 在 V3.2 Arcade 的 14 款游戏基础上替换旧王国争霸：48 个不规则省份、2–8 国、45 秒同步规划、每轮最多 4 条私有指令、最多 20 轮。
 - 新增金币、粮食、人口、三兵种、四建筑、三条科技路线、八国特性、结盟与贸易、战争迷雾、三种胜利路径。
@@ -96,7 +102,7 @@ V3.4 在独立开发分支等待审查。C6 / WPS WebView 实机单机及跨设�
 
 | 💬 即时通信 | 🎮 游戏中心 | 🖥️ 桌面体验 |
 | :--- | :--- | :--- |
-| 群聊、私聊、频道、图片、引用回复、@成员、消息搜索 | 14 款联机游戏，最多 8 人大厅，支持观战与对局评论 | Dock、窗口管理、主题、通知中心、活动监视器、应用内黑屏 |
+| 群聊、私聊、频道、图片、引用回复、@成员、消息搜索 | 15 款游戏（5 款离线 AI / 混桌），最多 8 名真实在线成员，支持观战与对局评论 | Dock、窗口管理、主题、通知中心、活动监视器、应用内黑屏 |
 
 | 🔗 本地连接 | 🧩 应用框架 | 🛟 会话恢复 |
 | :--- | :--- | :--- |
@@ -104,16 +110,22 @@ V3.4 在独立开发分支等待审查。C6 / WPS WebView 实机单机及跨设�
 
 ## 🚀 快速上手
 
-**准备工作：** 两台或更多设备、同一个版本的 HTML、设备之间能够通信的获授权局域网。普通现代浏览器可作为开发或测试环境；受限 WebView 的功能取决于宿主权限。
+**准备工作：** 单机 AI 仅需一台设备及 HTML；联机需要两台或更多设备、同一个版本的 HTML、设备之间能够通信的获授权局域网。普通现代浏览器可作为开发或测试环境；受限 WebView 的功能取决于宿主权限。
 
 ### 01｜下载并打开
 
-1. 点击上面的 **下载新版 ZIP**，解压后进入 `client` 文件夹，打开 `Blackmi_OS_V3.2.1_Kingdoms.html`。
+1. 点击上面的 **下载最新版 ZIP**，解压后进入 `client` 文件夹，打开 `Blackmi_OS_V3.4_AI_Arena_RC2.html`。
 2. 在支持 WebRTC 的浏览器或管理方允许的 WebView 中打开该 HTML。文件预览器不一定执行 JavaScript。
 3. 看到 Blackmi OS 桌面后，点击「消息」或「游戏中心」。
 
 > [!TIP]
 > 所有参与者使用相同版本。无需 npm、Python 服务或 ESP32；本地文件能打开不代表设备之间一定能够建立 WebRTC 连接。
+
+### 单机人机 / 混桌
+
+单机：游戏中心选择五子棋、UNO、汉末·逐鹿、德州扑克或王国争霸，点击「单机人机」直接以最低人数开局。结束后可在准备页调整人数、难度或性格。
+
+混桌：房主先创建大厅并完成真人配对，在准备页安排真人座位，再增加 AI 或自动补位。真人确认准备，AI 自动准备；总参赛人数遵守原游戏限制，AI 不占用真实连接名额。德州混桌的首席必须为真人。
 
 ### 02｜两台设备开始聊天
 
@@ -179,18 +191,19 @@ flowchart TD
 
 ## 🎮 游戏图鉴
 
-**不知道玩什么？按人数选就行。**
+**15 款游戏，5 款支持单机 AI 和混桌。**
 
 | 人数 | 推荐 |
 | :--- | :--- |
 | 2 人 | 五子棋、中国象棋、八球台球、UNO、坦克大战、太空足球、王国争霸、合作生存 |
 | 3 人 | 斗地主、你画我猜、UNO、王国争霸、合作生存 |
-| 4–8 人 | 传话画画、谁是卧底、你画我猜、UNO、德州扑克、坦克大战、躲猫猫、王国争霸、合作生存；偶数人数可玩太空足球 |
+| 4–8 人 | 汉末·逐鹿、传话画画、谁是卧底、你画我猜、UNO、德州扑克、坦克大战、躲猫猫、王国争霸、合作生存；偶数人数可玩太空足球 |
 
 ### 🆕 多人聚会与竞技游戏
 
 | 游戏 | 人数 | 怎么玩 |
 | :--- | :---: | :--- |
+| ⚔️ **汉末·逐鹿** | 4–8 | 四身份、12 武将、108 张牌、军势与快速/标准节奏；支持 AI |
 | 🖍️ **传话画画** | 4–8 | 所有人同时写句子、画图、猜图，最后揭晓完整传话作品链 |
 | 🕵️ **谁是卧底** | 4–8 | 获取秘密词语，轮流描述，秘密投票找出卧底 |
 | 🌈 **UNO 彩色纸牌** | 2–8 | 匹配颜色或数字，使用功能牌，率先出完手牌 |
@@ -295,9 +308,11 @@ flowchart LR
 flowchart TD
     A["Blackmi OS · Web Desktop"] --> B["App SDK / Window Manager"]
     B --> C["Messages / Contacts"]
-    B --> D["Game Center / 14 Games"]
+    B --> D["Game Center / 15 Games"]
     C --> E["Connect Core / Replica Engine"]
     D --> F["Game Session Engine / GameLink"]
+    D --> I["Bot Manager / 5 AI Policies"]
+    I --> F
     E --> G["WebRTC DataChannel"]
     F --> G
     H["QR / SDP exchange"] --> G
@@ -318,12 +333,12 @@ flowchart TD
 
 | 项目 | 当前信息 |
 | :--- | :--- |
-| 最新构建 | V3.2.1 Kingdoms Reborn（main 开发候选版） |
+| 最新构建 | V3.4 AI Arena RC2（main 发布版，实机待验） |
 | 日期 | 2026-11-28 |
-| 文件大小 | 556,718 bytes（约 544 KiB） |
+| 文件大小 | 677,344 bytes（661.47 KiB） |
 | 技术栈 | HTML / CSS / JavaScript / Canvas / WebRTC |
 | 适配目标 | 历史 C6 / Android 9 / Chromium 80 WebView；834×360、960×600 横屏 |
-| 发布状态 | 开发候选版，完整浏览器 UI 与 C6 实机多人验收待完成 |
+| 发布状态 | PR #2/#3/#4 已合入 main；代码复审及开发者浏览器测试通过，C6/WPS 实机验收待完成 |
 
 | 测试项目 | 状态 |
 | :--- | :--- |
@@ -340,7 +355,9 @@ flowchart TD
 | V3.1.2 脚本与来源标识 | ✅ 所有脚本与 3.1.1 逐字节一致，原 AI 来源元数据保留 |
 | V3.2.1 王国重生 | ✅ 70次地图生成与起始领地检查、同步回合、外交、私有指令及14款游戏模拟开局；非实机联机 |
 | V3.2.1 状态容量 | ✅ 代表性含30条评论的快照10,232字符，低于120,000字符上限 |
-| ESP32 常驻 Core、AI | 📝 规划阶段，未实现或验收 |
+| V3.4 AI Arena RC2 | ✅ 开发者报告 86/86 自动化、15 款真人模拟开局、Chromium 80 双视口；独立复审通过，实机待验 |
+| V3.4 真机联机 | ⏳ C6/WPS 及真实长时性能待验；开发机 RTC ICE 收集超时 |
+| ESP32 常驻 Core、外部大模型 | 📝 规划或暂缓，未实现或验收 |
 
 <details>
 <summary><b>查看版本演进与文件校验值</b></summary>
@@ -362,8 +379,17 @@ flowchart TD
 | V3.1.3 | Composer Fix：聊天输入布局、统一版本 |
 | V3.2 | Arcade：太空足球、躲猫猫、旧王国争霸、合作生存 |
 | V3.2.1 | Kingdoms Reborn：完整同步战略重制 |
+| V3.2.2 | Developer SDK：应用及回合制注册、按需绘制、稳定性修复 |
+| V3.3 RC2 | 汉末·逐鹿：15 款游戏，快速/标准节奏 |
+| V3.4 RC2 | AI Arena：5 款离线 AI、混桌、王国影子规划与五子棋威胁搜索 |
 
 版本演进不代表所有中间构建均已归档至 GitHub。历史 [V2.9 CoverFix](client/Blackmi_OS_V2.9_CoverFix.html) 仍可下载。[V3.1.1 Viewport Fit](client/Blackmi_OS_V3.1.1_ViewportFit.html) 也保留。
+
+SHA-256（V3.4 RC2，原始文件校验）：
+
+```text
+815f9fcecbbb9e75a0e4cb34ee6bf3e46e116e8fbf359abf789c4d14ee99ccef
+```
 
 SHA-256（V3.1.2，原始文件校验）：
 
@@ -387,7 +413,9 @@ archive/     历史原型与实验
 labs/        能力与通信测试工具
 docs/        设计、历史、设备测试与安全文档
   assets/    README 插图及运行截图
-tests/       历史测试数据
+sdk/         开发者 SDK、示例、Bot Manager 与策略模块
+games/       独立游戏模块（汉末·逐鹿）
+tests/       自动化测试与历史测试数据
 ```
 
 | 想了解什么？ | 阅读 |
@@ -402,8 +430,8 @@ tests/       历史测试数据
 | 设备到底支持什么 | [设备画像、权限及历史实测](docs/DEVICE-TESTS.md) |
 | PAD 最新权限与实机能力 | [Hardware Lab 能力矩阵](docs/PAD_CAPABILITIES.md) |
 | 游戏与系统性能预算 | [PERFORMANCE_BUDGET.md](docs/PERFORMANCE_BUDGET.md) |
-
-开发者可用 [V3.2.2 SDK 候选](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 打包本地应用和回合制游戏。仓库提供 [计数器与取石子示例](sdk/examples) 以及 [测试记录](TESTING.md)。正式下载仍指向 V3.2.1。
+ 
+| AI 策略与混桌开发 | [Bot Manager 指南](sdk/bots/README.md) |
 | Hardware Lab V2.0 实测摘要 | [批次 mwzt8gbr JSON](tests/Blackmi_PAD_Lab_mwzt8gbr.json) |
 | WebRTC 如何建立连接 | [历史 V1/V2 通信机制](docs/RTC-ARCHITECTURE.md) |
 | ESP32 与未来架构 | [常驻 Core 设计](docs/CORE-DESIGN.md) |
@@ -411,6 +439,8 @@ tests/       历史测试数据
 | 后续开发与验收 | [开发路线图](docs/ROADMAP.md) |
 | 原始历史测试数据 | [测试 CSV](tests/core-lab-rtc.csv) |
 | 安全与公开发布 | [安全说明](docs/SECURITY.md) |
+
+开发者可用 [V3.2.2 SDK](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 及 [计数器与取石子示例](sdk/examples) 开发应用和回合制游戏；V3.4 构建与 AI 策略见 [人机开发指南](sdk/bots/README.md)。
 
 早期文档保留原有版本语境，以本 README 标注的最新版实现范围为准。
 
@@ -432,7 +462,7 @@ tests/       历史测试数据
 
 </div>
 
-### V3.3 候选 · 汉末逐鹿
+### V3.3 历史构建 · 汉末逐鹿
 
 下载 [V3.3 RC2 单文件 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html)，在游戏中心选择「汉末·逐鹿」，4–8 人入座准备后开局，可选 18 分钟快速局或 35 分钟标准局。四种身份、12 名武将、108 张牌。装备和座次影响距离，军势可换取攻击窗口或护垒。[完整规则与技能](games/three-kingdoms/README.md)
 
