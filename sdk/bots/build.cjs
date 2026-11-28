@@ -4,7 +4,7 @@ const {Script}=require('node:vm');
 
 const base=path.join(__dirname,'../../client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html');
 const release=path.join(__dirname,'../../client/Blackmi_OS_V3.4_AI_Arena.html');
-const modules=['manager.js','adapters.js','gomoku.js','uno.js','seats.js'];
+const modules=['manager.js','adapters.js','gomoku.js','uno.js','three-kingdoms.js','seats.js'];
 function build(output=release){
   let html=fs.readFileSync(base,'utf8');
   function replace(before,after){

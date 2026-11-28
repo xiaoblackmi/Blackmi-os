@@ -26,5 +26,20 @@
         private:privateState,actions:actions,fallback:actions[0]};
     }
   };
+  api.adapters['three-kingdoms']={
+    turn:function(m,bots){
+      var w=m.rules.window,id=w&&m.pub.players[w.seat];
+      if(!w||w.type==='mode'||!bots[id]||!m.rules.seats[w.seat].alive)return null;
+      return {id:id,index:w.seat,key:w.seq,deadline:w.deadline};
+    },
+    view:function(m,id){
+      var p=m.rules.publicFor(id),privateState=m.rules.privateFor(id),actions=[];
+      for(var group of privateState.options){
+        if(group.targets.length)group.targets.forEach(target=>actions.push(Object.assign({},group.action,{target:target,seq:p.pending.seq})));
+        else actions.push(Object.assign({},group.action,{seq:p.pending.seq}));
+      }
+      return {public:p,private:privateState,actions:actions,fallback:actions.find(a=>['pass','end-turn','auto-discard'].includes(a.kind))};
+    }
+  };
   api.turn=turn;
 })(ArenaBots);

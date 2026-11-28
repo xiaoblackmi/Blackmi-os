@@ -17,7 +17,7 @@ function world(seed=1,file=release){
     Date:class extends Date{static now(){return time;}},
     crypto:{getRandomValues(a){for(let i=0;i<a.length;i++)a[i]=rng()*4294967296;return a;}},
     setInterval:()=>0,BlackmiApps:{register(){},close(){}}});
-  vm.runInContext(gameScript(file).replace('})(globalThis);','globalThis.Test={Lobby,Match,Uno,Holdem,KingdomMatch,ArenaBots,unoCard};\n})(globalThis);'),ctx);
+  vm.runInContext(gameScript(file).replace('})(globalThis);','globalThis.Test={Lobby,Match,Uno,Holdem,KingdomMatch,SdkRoundMatch,ArenaBots,unoCard,sdkGames};\n})(globalThis);'),ctx);
   for(const code of scripts(file).slice(-5))vm.runInContext(code,ctx);
   return {...ctx.Test,ctx,now:()=>time,advance:ms=>{time+=ms;}};
 }
@@ -190,6 +190,49 @@ test('200 seeded Gomoku games and 200 seeded UNO games terminate with legal move
     assert.equal(b.pub.phase,'end');
   }
   t.diagnostic(JSON.stringify({seeds:[3401,'41000–41199','42000–42199'],gomoku:summary(gomoku),uno:summary(uno)}));
+});
+
+test('Three Kingdoms keeps tempo choices human and decisions invariant to hidden opponent hands',()=>{
+  const w=world(),l=scene(w,'three-kingdoms',4),m=l.match;
+  l.tick();
+  assert.equal(l.botManager.pending,null);
+  assert.equal(m.rules.window.type,'mode');
+  l.act({kind:'set-mode',choice:'fast',seq:m.rules.window.seq});
+  assert.equal(m.rules.mode,'fast');
+  const r=m.rules,bot=r.seats[1].id;
+  r.phase='play';r.active=1;r.window=null;r.jobs=[];r.open('play',1);
+  const adapter=w.ArenaBots.adapters['three-kingdoms'];
+  const before=plain(adapter.view(m,bot));
+  const a=r.seats[2],b=r.seats[3];
+  [a.hand[0],b.hand[0]]=[b.hand[0],a.hand[0]];
+  if(a.role!=='lord'&&b.role!=='lord')[a.role,b.role]=[b.role,a.role];
+  const after=plain(adapter.view(m,bot));
+  assert.deepEqual(before,after);
+  const choose=v=>plain(w.ArenaBots.strategies['three-kingdoms']({publicState:v.public,privateState:v.private,
+    legalActions:v.actions,difficulty:'normal',memory:{},random:random(77)}));
+  assert.deepEqual(choose(before),choose(after));
+  assert.equal(before.private.role,r.seats[1].role);
+  assert(!before.public.seats.some(seat=>'hand' in seat));
+});
+
+test('200 seeded Three Kingdoms policy games finish with intact card zones',t=>{
+  const w=world(3402),results=[];
+  for(let i=0;i<200;i++){
+    const ids=Array.from({length:4+i%5},(_,j)=>'seat'+j),m=new w.SdkRoundMatch(w.sdkGames['three-kingdoms'],ids,ids[0]);
+    m.act(ids[0],{kind:'set-mode',choice:i%2?'fast':'standard',seq:m.rules.window.seq});
+    results.push(sim(w,'three-kingdoms',m,{rng:random(43000+i),limit:4000,invariant:m=>{
+      const r=m.rules,wnd=r.window,ids=r.pile.concat(r.discard);
+      r.seats.forEach(p=>ids.push(...p.hand,...p.delay,...Object.values(p.gear).filter(x=>x!==null)));
+      if(wnd&&wnd.order!==undefined)ids.push(wnd.order);
+      if(wnd&&wnd.look)ids.push(...wnd.look);
+      assert.equal(ids.length,108);assert.equal(new Set(ids).size,108);
+      assert(r.seats.every(p=>p.power>=0&&p.power<=3));
+      w.advance(800);
+      m.tick();
+    }}));
+    assert.equal(m.pub.phase,'end');
+  }
+  t.diagnostic(JSON.stringify({seeds:[3402,'43000–43199'],threeKingdoms:summary(results)}));
 });
 
 test('candidate is deterministic and transport, pairing, chat and AIGC remain exact',t=>{
