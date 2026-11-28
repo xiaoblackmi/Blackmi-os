@@ -13,3 +13,6 @@
 
 ## 当前未验收
 V3.2.1 完整浏览器视觉回归、目标 PAD 真实多人游戏、长时稳定性、实际 FPS/内存、2.4GHz 网络 ICE 失败根因待验。分支 README 记录70次地图生成/起始领地检查、同步回合、外交、私有指令、14款模拟开局、含30条评论代表性快照10232字符（上限120000）；本次合并未重跑测试。王国需额外验证 publicFor/privateFor 对参赛者与观战者的隔离。历史八台 V2 群聊不代表当前版本全功能通过。
+
+## Hardware Lab V2.0（2026-11-28）
+参照 [实测权限](docs/PAD_CAPABILITIES.md) 与 [性能预算](docs/PERFORMANCE_BUDGET.md)，原始简化数据见 [mwzt8gbr](tests/Blackmi_PAD_Lab_mwzt8gbr.json)。960×600 独立 Lab 实测，不是 OS 真机验收。按预算做新增功能性能回归；834×360、真实跨设备通信、完整内存与后台测试仍待补测。
