@@ -392,6 +392,9 @@ tests/       历史测试数据
 | 发布与测试门槛 | [TESTING.md](TESTING.md) |
 | 项目怎么发展到今天 | [开发演进与源码索引](docs/HISTORY.md) |
 | 设备到底支持什么 | [设备画像、权限及历史实测](docs/DEVICE-TESTS.md) |
+| PAD 最新权限与实机能力 | [Hardware Lab 能力矩阵](docs/PAD_CAPABILITIES.md) |
+| 游戏与系统性能预算 | [PERFORMANCE_BUDGET.md](docs/PERFORMANCE_BUDGET.md) |
+| Hardware Lab V2.0 实测摘要 | [批次 mwzt8gbr JSON](tests/Blackmi_PAD_Lab_mwzt8gbr.json) |
 | WebRTC 如何建立连接 | [历史 V1/V2 通信机制](docs/RTC-ARCHITECTURE.md) |
 | ESP32 与未来架构 | [常驻 Core 设计](docs/CORE-DESIGN.md) |
 | 客户端交互设计 | [历史 UI 规格](docs/FRONTEND.md) |
