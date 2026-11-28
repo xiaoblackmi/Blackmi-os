@@ -4,13 +4,13 @@
 
 **一个 HTML 文件，一张局域网，一个属于自己的多人应用空间。**
 
-![Version](https://img.shields.io/badge/Version-3.1.2%20Notice%20Safe-3478ED?style=flat-square)
-![HTML](https://img.shields.io/badge/Single%20HTML-497%20KiB-526B91?style=flat-square)
-![Games](https://img.shields.io/badge/Games-10-269579?style=flat-square)
+![Version](https://img.shields.io/badge/Version-3.2.1%20Kingdoms%20Reborn-3478ED?style=flat-square)
+![HTML](https://img.shields.io/badge/Single%20HTML-544%20KiB-526B91?style=flat-square)
+![Games](https://img.shields.io/badge/Games-14-269579?style=flat-square)
 ![Players](https://img.shields.io/badge/Lobby-Up%20to%208-8066B5?style=flat-square)
 ![Status](https://img.shields.io/badge/Status-Development-E0A34C?style=flat-square)
 
-### [⬇️ 下载最新版](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/main/client/Blackmi_OS_V3.1.2_NoticeSafe.html) · [📖 查看源码](client/Blackmi_OS_V3.1.2_NoticeSafe.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
+### [⬇️ 下载新版 ZIP](https://github.com/xiaoblackmi/Blackmi-os/archive/0e6090a10289a7a83666e0789f66ab4376ce54f2.zip) · [📖 查看源码](client/Blackmi_OS_V3.2.1_Kingdoms.html) · [🐛 反馈问题](https://github.com/xiaoblackmi/Blackmi-os/issues)
 
 *Local-first communication, applications and multiplayer games.*
 
@@ -22,7 +22,7 @@
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
 >
-> 当前 V3.1.2 Refined · Notice Safe 为开发版，优先适配 834×360 超宽屏 WebView。上图为用户提供的实际客户端预览截图，不是设计效果图，也不是 C6 实机联机验收。
+> 当前分支 V3.2.1 Kingdoms Reborn 为开发候选版，优先适配 834×360 超宽屏 WebView。上图为 V3.1.2 历史客户端截图，并非新版实机验收。游戏大厅协议 321，参与者必须统一版本。
 
 ---
 
@@ -30,7 +30,14 @@
 
 [界面展示](#-界面实录--screenshots) · [功能介绍](#-你可以做什么) · [快速上手](#-快速上手) · [游戏图鉴](#-游戏图鉴) · [技术架构](#-技术架构) · [版本与验收](#-版本与验收)
 
-## 🆕 V3.1.2 · Refined / Notice Safe
+## 🆕 V3.2.1 · Kingdoms Reborn
+
+- 在 V3.2 Arcade 的 14 款游戏基础上替换旧王国争霸：48 个不规则省份、2–8 国、45 秒同步规划、每轮最多 4 条私有指令、最多 20 轮。
+- 新增金币、粮食、人口、三兵种、四建筑、三条科技路线、八国特性、结盟与贸易、战争迷雾、三种胜利路径。
+- 地图静态缓存与事件驱动重绘，无持续物理模拟、无外部依赖。房主统一结算；回合内只同步操作、提交与结算状态。
+- 规则和大厅消息分发模拟通过，真实 C6 联机与完整浏览器视觉回归待验收。
+
+## V3.1.2 历史桌面设计
 
 | 桌面 | 应用与游戏 | 兼容性 |
 | :--- | :--- | :--- |
@@ -81,7 +88,7 @@
 
 | 💬 即时通信 | 🎮 游戏中心 | 🖥️ 桌面体验 |
 | :--- | :--- | :--- |
-| 群聊、私聊、频道、图片、引用回复、@成员、消息搜索 | 10 款联机游戏，最多 8 人大厅，支持观战与对局评论 | Dock、窗口管理、主题、通知中心、活动监视器、应用内黑屏 |
+| 群聊、私聊、频道、图片、引用回复、@成员、消息搜索 | 14 款联机游戏，最多 8 人大厅，支持观战与对局评论 | Dock、窗口管理、主题、通知中心、活动监视器、应用内黑屏 |
 
 | 🔗 本地连接 | 🧩 应用框架 | 🛟 会话恢复 |
 | :--- | :--- | :--- |
@@ -93,7 +100,7 @@
 
 ### 01｜下载并打开
 
-1. 点击上面的 **下载最新版**，保存为 `Blackmi_OS_V3.1.2_NoticeSafe.html`。如果浏览器只显示源码，使用浏览器的保存文件功能。
+1. 点击上面的 **下载新版 ZIP**，解压后进入 `client` 文件夹，打开 `Blackmi_OS_V3.2.1_Kingdoms.html`。
 2. 在支持 WebRTC 的浏览器或管理方允许的 WebView 中打开该 HTML。文件预览器不一定执行 JavaScript。
 3. 看到 Blackmi OS 桌面后，点击「消息」或「游戏中心」。
 
@@ -168,9 +175,9 @@ flowchart TD
 
 | 人数 | 推荐 |
 | :--- | :--- |
-| 2 人 | 五子棋、中国象棋、八球台球、UNO、坦克大战 |
-| 3 人 | 斗地主、你画我猜、UNO |
-| 4–8 人 | 传话画画、谁是卧底、你画我猜、UNO、德州扑克、坦克大战 |
+| 2 人 | 五子棋、中国象棋、八球台球、UNO、坦克大战、太空足球、王国争霸、合作生存 |
+| 3 人 | 斗地主、你画我猜、UNO、王国争霸、合作生存 |
+| 4–8 人 | 传话画画、谁是卧底、你画我猜、UNO、德州扑克、坦克大战、躲猫猫、王国争霸、合作生存；偶数人数可玩太空足球 |
 
 ### 🆕 多人聚会与竞技游戏
 
@@ -180,6 +187,31 @@ flowchart TD
 | 🕵️ **谁是卧底** | 4–8 | 获取秘密词语，轮流描述，秘密投票找出卧底 |
 | 🌈 **UNO 彩色纸牌** | 2–8 | 匹配颜色或数字，使用功能牌，率先出完手牌 |
 | 🕹️ **坦克大战** | 2–8 | 虚拟坦克竞技，实时操控与对局状态同步 |
+| ⚽ **太空足球** | 2/4/6/8 | 平衡分队、移动射门、5球或120秒结算 |
+| 🌿 **躲猫猫** | 4–8 | 10秒准备、视野过滤、接触抓捕 |
+| 👑 **王国争霸** | 2–8 | 同步规划、发展经济、征兵、科技、外交、领土争夺 |
+| 🛡️ **合作生存** | 2–8 | 自动攻击、冲刺躲避、全队生存120秒 |
+
+### 👑 王国争霸新手教程
+
+1. 创建游戏大厅，选择「王国争霸」，参赛者入座并确认准备。
+2. 开局后每国拥有一座首都与一个相邻省份。点击省份查看地形、驻军和建筑。
+3. 在「领土」栏征兵、建设，或选择「半军出征 / 主力出征」，再点击高亮相邻省份。
+4. 「科技」栏研究农业、军事、经济；「外交」栏发起或接受结盟和贸易邀请。每轮最多四条指令，提交前可以通过指令列表撤销。
+5. 点击「提交本轮」，全员提交或45秒到期后，房主统一结算外交、建设与征兵、军事行动和收入。进入下一轮后继续操作。
+6. 占领32省或成为最后一个存活国家可获得军事胜利；拥有至少8省、100金、100粮且经济科技满级可获得经济胜利；20轮结束按战略积分排名。
+
+> 步兵克骑兵、骑兵克弓兵、弓兵克步兵。山地、森林、河谷和城墙增强防御。战争迷雾隐藏远方军队、建筑和其他国家资源，但公开领土归属和排名。房主仍需可信，断线参赛者将触发现有中止机制。
+
+```mermaid
+flowchart LR
+  A[45秒全员规划] --> B[私有指令与提交]
+  B --> C[外交结算]
+  C --> D[建设 科技 征兵]
+  D --> E[调兵与战斗]
+  E --> F[收入与胜负判定]
+  F --> A
+```
 
 ### 经典游戏
 
@@ -255,7 +287,7 @@ flowchart TD
 flowchart TD
     A["Blackmi OS · Web Desktop"] --> B["App SDK / Window Manager"]
     B --> C["Messages / Contacts"]
-    B --> D["Game Center / 10 Games"]
+    B --> D["Game Center / 14 Games"]
     C --> E["Connect Core / Replica Engine"]
     D --> F["Game Session Engine / GameLink"]
     E --> G["WebRTC DataChannel"]
@@ -278,12 +310,12 @@ flowchart TD
 
 | 项目 | 当前信息 |
 | :--- | :--- |
-| 最新构建 | V3.1.2 Refined · Notice Safe |
-| 日期 | 2026-11-27 |
-| 文件大小 | 509,138 bytes（约 497 KiB） |
+| 最新构建 | V3.2.1 Kingdoms Reborn（开发分支） |
+| 日期 | 2026-11-28 |
+| 文件大小 | 556,718 bytes（约 544 KiB） |
 | 技术栈 | HTML / CSS / JavaScript / Canvas / WebRTC |
 | 适配目标 | 历史 C6 / Android 9 / Chromium 80 WebView；834×360、960×600 横屏 |
-| 发布状态 | 开发版，V3.1.2 目标 PAD 实机多人联机待验收 |
+| 发布状态 | 开发候选版，完整浏览器 UI 与 C6 实机多人验收待完成 |
 
 | 测试项目 | 状态 |
 | :--- | :--- |
@@ -298,6 +330,8 @@ flowchart TD
 | V3.1.1 通信与游戏 | ⏳ 继承原核心，目标 PAD 实机回归待验收 |
 | V3.1.2 安全区 | 🧪 834×360 Chromium 实运行：桌面、Launchpad、游戏中心可打开；模拟提示不遮挡 Dock |
 | V3.1.2 脚本与来源标识 | ✅ 所有脚本与 3.1.1 逐字节一致，原 AI 来源元数据保留 |
+| V3.2.1 王国重生 | ✅ 70次地图生成与起始领地检查、同步回合、外交、私有指令及14款游戏模拟开局；非实机联机 |
+| V3.2.1 状态容量 | ✅ 代表性含30条评论的快照10,232字符，低于120,000字符上限 |
 | ESP32 常驻 Core、AI | 📝 规划阶段，未实现或验收 |
 
 <details>
@@ -317,6 +351,9 @@ flowchart TD
 | V3.1 | Refined 视觉重构、Launchpad 搜索 |
 | V3.1.1 | Viewport Fit：超宽屏、壁纸覆盖与紧凑布局 |
 | V3.1.2 | Notice Safe：宿主提示安全区与截图文档 |
+| V3.1.3 | Composer Fix：聊天输入布局、统一版本 |
+| V3.2 | Arcade：太空足球、躲猫猫、旧王国争霸、合作生存 |
+| V3.2.1 | Kingdoms Reborn：完整同步战略重制 |
 
 版本演进不代表所有中间构建均已归档至 GitHub。历史 [V2.9 CoverFix](client/Blackmi_OS_V2.9_CoverFix.html) 仍可下载。[V3.1.1 Viewport Fit](client/Blackmi_OS_V3.1.1_ViewportFit.html) 也保留。
 
@@ -326,10 +363,10 @@ SHA-256（V3.1.2，原始文件校验）：
 9f5e9e857fb7b6282e469ddb573f256836f5413813f5111171ccba3ece2fff36
 ```
 
-Git Blob SHA：
+Git Blob SHA（V3.2.1）：
 
 ```text
-427c79f42be77e7928a4f14d27248ac0526e6231
+cb0630b013fdab48e5976c082509882e650dbd5b
 ```
 
 </details>
