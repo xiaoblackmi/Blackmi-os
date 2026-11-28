@@ -30,9 +30,9 @@
 
 [界面展示](#-界面实录--screenshots) · [功能介绍](#-你可以做什么) · [快速上手](#-快速上手) · [游戏图鉴](#-游戏图鉴) · [技术架构](#-技术架构) · [版本与验收](#-版本与验收)
 
-## V3.4 · AI Arena 开发候选
+## V3.4 · AI Arena RC2 开发候选
 
-[下载 V3.4 单 HTML](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/feature/3.4-ai-arena/client/Blackmi_OS_V3.4_AI_Arena.html) · [人机使用与开发指南](sdk/bots/README.md) · [测试结果](TESTING.md#v34-ai-arena-开发候选)
+[下载 V3.4 RC2 单 HTML](https://raw.githubusercontent.com/xiaoblackmi/Blackmi-os/feature/3.4-ai-arena/client/Blackmi_OS_V3.4_AI_Arena_RC2.html) · [RC1 历史构建](client/Blackmi_OS_V3.4_AI_Arena.html) · [人机使用与开发指南](sdk/bots/README.md) · [测试结果](TESTING.md#v34-ai-arena-rc2)
 
 五子棋、UNO、汉末·逐鹿、德州扑克和王国争霸支持单人离线和真人与 AI 混桌。游戏中心内选择「单机人机」可直接开始。混桌使用同版 V3.4 客户端，由房主在赛前准备页增加或补足 AI，真人按正常流程就座和准备。德州积分仅供游戏内娱乐。
 

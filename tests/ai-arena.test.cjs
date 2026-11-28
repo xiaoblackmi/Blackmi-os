@@ -6,19 +6,19 @@ const path=require('node:path');
 const vm=require('node:vm');
 const {performance}=require('node:perf_hooks');
 const {test}=require('node:test');
-const {build,base,release}=require('../sdk/bots/build.cjs');
+const {build,base,rc1,release}=require('../sdk/bots/build.cjs');
 
 function random(seed){return ()=>((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);}
 function scripts(file){return Array.from(fs.readFileSync(file,'utf8').matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g),x=>x[1]);}
 function gameScript(file){return scripts(file).find(x=>x.includes('class Lobby {'));}
 function plain(x){return JSON.parse(JSON.stringify(x));}
-function world(seed=1,file=release){
+function world(seed=1,file=release,clock=performance){
   let time=100000;
-  const rng=random(seed), ctx=vm.createContext({performance,console,document:{readyState:'loading'},
+  const rng=random(seed), ctx=vm.createContext({performance:clock,console,document:{readyState:'loading'},
     Date:class extends Date{static now(){return time;}},
     crypto:{getRandomValues(a){for(let i=0;i<a.length;i++)a[i]=rng()*4294967296;return a;}},
     setInterval:()=>0,BlackmiApps:{register(){},close(){}}});
-  vm.runInContext(gameScript(file).replace('})(globalThis);','globalThis.Test={Lobby,Match,Uno,Holdem,KingdomMatch,SdkRoundMatch,ArenaBots:typeof ArenaBots==="undefined"?null:ArenaBots,unoCard,sdkGames};\n})(globalThis);'),ctx);
+  vm.runInContext(gameScript(file).replace('})(globalThis);','globalThis.Test={Lobby,Match,Uno,Holdem,KingdomMatch,SdkRoundMatch,ArenaBots:typeof ArenaBots==="undefined"?null:ArenaBots,unoCard,sdkGames,kingdomPlan:typeof BlackmiArenaPolicies==="undefined"?null:BlackmiArenaPolicies.kingdomPlan};\n})(globalThis);'),ctx);
   for(const code of scripts(file).slice(-5))vm.runInContext(code,ctx);
   return {...ctx.Test,ctx,now:()=>time,advance:ms=>{time+=ms;}};
 }
@@ -160,7 +160,7 @@ test('UNO adapter follows W4, draw-only and two-player reversal rules',()=>{
 
 function sim(w,kind,m,options={}){
   const ada=w.ArenaBots.adapters[kind],policy=w.ArenaBots.strategies[kind],rng=options.rng||random(541);
-  const profile=Object.fromEntries(m.pub.players.map((id,i)=>[id,{difficulty:i%2?'normal':'easy',
+  const profile=Object.fromEntries(m.pub.players.map((id,i)=>[id,(options.profiles&&options.profiles[i])||{difficulty:i%2?'normal':'easy',
     persona:(w.ArenaBots.personas[kind]||[])[i%((w.ArenaBots.personas[kind]||[]).length)]||''}]));
   const times=[],outcomes={};
   let step=0,cursor=0;
@@ -168,12 +168,13 @@ function sim(w,kind,m,options={}){
   for(;step<(options.limit||4000)&&m.pub.phase==='play';step++){
     const turn=ada.turn(m,profile,cursor);
     if(!turn){if(options.human&&options.human(m,w))continue;break;}
-    const view=ada.view(m,turn.id),t=performance.now();
+    const t=performance.now(),view=ada.view(m,turn.id);
     const action=policy({publicState:plain(view.public),privateState:plain(view.private),legalActions:plain(view.actions),
       difficulty:profile[turn.id].difficulty,persona:profile[turn.id].persona,memory:memories.get(turn.id)||{},random:rng});
     times.push(performance.now()-t);
     const valid=view.actions.find(x=>JSON.stringify(x)===JSON.stringify(action));
     assert(valid,'illegal '+kind+' '+JSON.stringify(action));
+    if(options.onAction)options.onAction(m,turn,valid,profile[turn.id]);
     m.act(turn.id,valid);
     if(ada.observe)memories.set(turn.id,ada.observe(view.public,memories.get(turn.id)||{}));
     cursor=turn.index+1;
@@ -542,12 +543,17 @@ test('candidate is deterministic and transport, pairing, chat and AIGC remain ex
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arena-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
   assert(fs.readFileSync(build(path.join(dir,'built.html'))).equals(fs.readFileSync(release)),'candidate differs from a clean build');
-  const before=gameScript(base),after=gameScript(release);
-  const frozen=spawnSync('git',['diff','--exit-code','c1781b7faf6d8b9f2152612dfab0291729a2bd1f','--',
-    'client',':(exclude)client/Blackmi_OS_V3.4_AI_Arena.html','sdk/blackmi-sdk.d.ts','sdk/bundle.cjs'],
+  const before=gameScript(base),after=gameScript(release),historical=gameScript(rc1);
+  const frozen=spawnSync('git',['diff','--exit-code','7c4756462aa872179e5ceace9655d2613434f1a9','--',
+    'client',':(exclude)client/Blackmi_OS_V3.4_AI_Arena_RC2.html','sdk/blackmi-sdk.d.ts','sdk/bundle.cjs',
+    'sdk/bots/manager.js','sdk/bots/seats.js','sdk/bots/uno.js','sdk/bots/three-kingdoms.js','sdk/bots/holdem.js'],
     {cwd:path.join(__dirname,'..'),encoding:'utf8'});
   if(frozen.status!==128&&frozen.error?.code!=='ENOENT')assert.equal(frozen.status,0,frozen.stderr||frozen.stdout);
   function span(s,a,b){const i=s.indexOf(a),j=s.indexOf(b,i+1);assert(i>=0&&j>i);return s.slice(i,j);}
+  for(const [a,b] of [['class KingdomMatch{','// Bundled SDK round games'],['class Lobby {','var ArenaBots = (function()'],
+    ['var ArenaBots = (function()','  function turn(m,bots,key,deadline)']]){
+    assert.equal(span(historical,a,b),span(after,a,b));
+  }
   for(const [a,b] of [['class Link {','// V2.8 application-layer games'],[' async offer(){check(this.role',' setSnapshot(']]){
     assert.equal(span(before,a,b),span(after,a,b));
   }
@@ -560,4 +566,285 @@ test('candidate is deterministic and transport, pairing, chat and AIGC remain ex
   }
   for(const file of [base,release])assert.match(fs.readFileSync(file,'utf8'),/<meta name="AIGC"/);
   assert.equal(fs.readFileSync(base,'utf8').match(/<meta name="AIGC"[^>]*>/)[0],fs.readFileSync(release,'utf8').match(/<meta name="AIGC"[^>]*>/)[0]);
+});
+
+function kingdomCapital(w){
+  const m=new w.KingdomMatch(['x','y','z']),p=m.pub;
+  const cap=p.tiles.findIndex(t=>t.cap===0);
+  const near=[cap%8?cap-1:-1,cap%8<7?cap+1:-1,cap>=8?cap-8:-1,cap<40?cap+8:-1].filter(j=>j>=0);
+  return {m,p,cap,home:near.find(j=>p.tiles[j].owner===0),border:near.find(j=>p.tiles[j].owner!==0)};
+}
+function policyInput(view,persona,memory={},rng=()=>.5){
+  return {publicState:plain(view.public),privateState:plain(view.private),legalActions:plain(view.actions),
+    difficulty:'normal',persona,memory,random:rng};
+}
+
+test('Kingdoms shadow prevents the RC1 four-recruit capital failure',()=>{
+  function run(w){
+    const {m,p,cap,border}=kingdomCapital(w),ada=w.ArenaBots.adapters.kingdoms;
+    p.tiles[cap].army=[23,2,2];p.tiles[cap].build[3]=2;
+    p.tiles[border].owner=1;p.tiles[border].army=[22,4,4];
+    p.tiles.forEach((t,i)=>{if(i!==cap&&t.owner===0){t.army=[26,2,2];t.build=[2,2,1,2];}});
+    Object.assign(p.realms[0],{gold:160,food:150,pop:60,tech:[3,3,3]});
+    const orders=[];
+    for(let i=0;i<5;i++){
+      const a=w.ArenaBots.strategies.kingdoms(policyInput(ada.view(m,'x'),'defense'));
+      if(a.kind==='ready')break;
+      orders.push(a);m.act('x',a);
+    }
+    let failed=0,executed=0;
+    for(const a of orders)if(a.kind==='recruit'&&a.from===cap){
+      try{m.execute(0,a);executed++;}catch(e){assert.match(e.message,/部队已满/);failed++;}
+    }
+    return {failed,executed,orders};
+  }
+  const historical=run(world(1,rc1)),candidate=run(world(1));
+  assert.equal(historical.orders.length,4);
+  assert.equal(historical.failed,3);
+  assert.equal(candidate.executed,1);
+  assert.equal(candidate.failed,0);
+});
+
+test('Kingdoms shadows costs, battalion capacity and build/research/recruit before moving',()=>{
+  const w=world(),{m,p,cap,home}=kingdomCapital(w),ada=w.ArenaBots.adapters.kingdoms;
+  const {project}=w.kingdomPlan;
+  const at=(kind,args)=>({kind,round:p.round,...args});
+  p.tiles[cap].army=[21,3,3];p.tiles[cap].build=[1,1,0,1];
+  p.tiles[home].army=[24,1,1];
+  Object.assign(p.realms[0],{gold:40,food:30,pop:10,tech:[0,0,0]});
+  const buildBarracks=at('build',{from:cap,item:2});
+  const infantry=at('recruit',{from:cap,unit:0});
+  const science=at('research',{item:1});
+  const march=at('march',{from:home,to:cap,mode:'half'});
+  const view=()=>ada.view(m,'x');
+  const before=plain(p);
+  assert(view().actions.some(a=>a.kind==='build'&&a.from===cap&&a.item===2));
+  for(const a of [buildBarracks,science,infantry])m.act('x',a);
+  const shadow=project(view().public,0,view().private.orders);
+  assert.deepEqual(plain(shadow.realm),{gold:22,food:22,pop:8,tech:[0,1,0]});
+  assert.equal(shadow.tile(cap).army.reduce((a,b)=>a+b),30);
+  assert.equal(shadow.tile(cap).build[2],1);
+  assert(!view().actions.some(a=>a.kind==='recruit'&&a.from===cap));
+  assert(!view().actions.some(a=>a.kind===march.kind&&a.from===home&&a.to===cap));
+  assert.deepEqual(plain(p),before);
+  for(const a of m.orders[0])m.execute(0,a);
+  assert.deepEqual(plain(p.tiles[cap]),plain(shadow.tile(cap)));
+  for(const [k,value] of Object.entries(shadow.realm))assert.deepEqual(plain(p.realms[0][k]),plain(value));
+});
+
+test('Kingdoms rejects the second transfer and economy orders that invalidate a planned transfer',()=>{
+  const w=world(),{m,p,cap,home,border}=kingdomCapital(w),ada=w.ArenaBots.adapters.kingdoms;
+  p.tiles[cap].owner=p.tiles[home].owner=p.tiles[border].owner=0;
+  p.tiles[cap].army=[20,0,0];p.tiles[home].army=[19,0,0];p.tiles[border].army=[14,0,0];
+  const a=(kind,args)=>({kind,round:p.round,...args});
+  m.act('x',a('march',{from:home,to:cap,mode:'half'}));
+  const actions=ada.view(m,'x').actions;
+  assert(!actions.some(o=>o.kind==='march'&&o.from===home));
+  assert(!actions.some(o=>o.kind==='march'&&o.from===border&&o.to===cap));
+  assert(!actions.some(o=>o.kind==='recruit'&&o.from===cap&&o.unit===0));
+  assert(!actions.some(o=>o.kind==='recruit'&&o.from===home&&o.unit===0));
+  const state=w.kingdomPlan.project(ada.view(m,'x').public,0,m.orders[0]);
+  assert.equal(state.tile(cap).army[0],29);
+  assert.equal(state.tile(home).army[0],10);
+  // Poor initial reserves distinguish planned expenditure from the original round's resources.
+  p.realms[0].gold=8;p.realms[0].food=8;
+  m.orders[0]=[];m.act('x',a('research',{item:0}));
+  assert(!ada.view(m,'x').actions.some(o=>['recruit','build','research'].includes(o.kind)));
+  m.orders[0]=[];
+  p.offers=[{id:'trade',kind:'trade',from:0,to:1,expires:p.round+1}];
+  assert(w.kingdomPlan.project(ada.view(m,'x').public,0,[]).realm.gold===2);
+  assert(!ada.view(m,'x').actions.some(o=>['recruit','build','research'].includes(o.kind)));
+});
+
+test('Kingdoms forecasts accepted alliances before marching and remembers only bounded visible strategy',()=>{
+  const w=world(),{m,p,cap,border}=kingdomCapital(w),ada=w.ArenaBots.adapters.kingdoms;
+  p.tiles[border].owner=1;p.tiles[border].army=[5,1,1];
+  p.offers=[{id:'ally',kind:'ally',to:0,from:1,expires:p.round+1}];
+  const march={kind:'march',from:cap,to:border,mode:'half',round:p.round},accept={kind:'accept',offer:'ally',round:p.round};
+  const view=()=>ada.view(m,'x');
+  assert(view().actions.some(a=>a.kind==='accept'));
+  m.act('x',march);
+  assert(!view().actions.some(a=>a.kind==='accept'));
+  m.orders[0]=[];m.act('x',accept);
+  assert(!view().actions.some(a=>a.kind==='march'&&a.to===border));
+  const memory=ada.observe(view().public,{});
+  assert.deepEqual(Object.keys(memory).sort(),['allies','capital','danger','focus','pressure','round','route']);
+  const focus=memory.focus;
+  assert.equal(ada.observe(view().public,memory),memory);
+  p.round++;p.tiles[focus].owner=0;p.realms[0].food=6;
+  const second=ada.observe(view().public,memory);
+  assert.notEqual(second.focus,focus);
+  assert.equal(second.pressure,'food');
+  assert.equal(second.round,p.round);
+});
+
+test('Kingdoms RC2 independent seeds report route, execution failures and player-normalized personality behaviors',t=>{
+  const results=[],reasons={},traits={},errors={};
+  let issued=0,executed=0,failed=0;
+  for(let game=0;game<100;game++){
+    const w=world(0x34620000+game),m=new w.KingdomMatch(Array.from({length:2+game%7},(_,i)=>'country-'+i));
+    const personas=w.ArenaBots.personas.kingdoms,profileBySeat=m.pub.players.map((_,i)=>personas[(game+i)%4]);
+    const engine=m.execute.bind(m);
+    const increments=profileBySeat.map(persona=>{
+      const stat=traits[persona]||(traits[persona]={seats:0,turns:0,attack:0,transfer:0,barracks:0,wall:0,economy:0,diplomacy:0});
+      stat.seats++;return stat;
+    });
+    m.execute=(i,a)=>{
+      const stat=increments[i],friendly=a.kind==='march'&&m.pub.tiles[a.to].owner===i;
+      try{engine(i,a);executed++;}catch(e){failed++;tally(errors,a.kind+' '+e.message);throw e;}
+      if(a.kind==='march')stat[friendly?'transfer':'attack']++;
+      if(a.kind==='build'&&a.item===2)stat.barracks++;
+      if(a.kind==='build'&&a.item===3)stat.wall++;
+      if(a.kind==='build'&&a.item<=1||a.kind==='research'&&a.item!==1)stat.economy++;
+      if(['trade','ally','accept','break'].includes(a.kind))stat.diplomacy++;
+    };
+    const ada=w.ArenaBots.adapters.kingdoms;
+    results.push(sim(w,'kingdoms',m,{limit:810,rng:random(0x34630000+game),
+      profiles:m.pub.players.map((_,i)=>({difficulty:'normal',persona:profileBySeat[i]})),
+      onAction(m,turn,action){
+        if(action.kind==='ready')increments[turn.index].turns++;
+        else issued++;
+        assert(ada.legal(m,turn.id,action));
+      }
+    }));
+    assert.equal(m.pub.phase,'end');
+    tally(reasons,m.pub.result);
+  }
+  assert.equal(executed+failed,issued);
+  assert((failed/issued)<.02,JSON.stringify(errors));
+  const rate=(persona,metric)=>traits[persona][metric]/traits[persona].turns;
+  assert(rate('military','attack')>rate('economy','attack'));
+  assert(rate('defense','wall')>rate('military','wall'));
+  assert(rate('diplomacy','diplomacy')>rate('military','diplomacy'));
+  assert(rate('economy','economy')>rate('military','economy'));
+  assert(Object.values(traits).reduce((n,x)=>n+x.barracks,0)>0);
+  t.diagnostic(JSON.stringify({ruleSeeds:'0x34620000–0x34620063',policySeeds:'0x34630000–0x34630063',
+    kingdom:summary(results),reasons,issued,executed,failed,errors,traits}));
+});
+
+const gomokuAxes=[[1,0],[0,1],[1,1],[1,-1]];
+function classicGomoku({publicState:p,legalActions:actions,random:rng}){
+  function shape(a,stone){
+    let score=0;
+    for(const [dx,dy] of gomokuAxes){
+      let length=1,open=0;
+      for(const side of [-1,1]){
+        let x=a.x+dx*side,y=a.y+dy*side;
+        for(;x>=0&&x<15&&y>=0&&y<15&&p.board[y*15+x]===stone;x+=dx*side,y+=dy*side)length++;
+        if(x>=0&&x<15&&y>=0&&y<15&&p.board[y*15+x]===0)open++;
+      }
+      if(length>=5)return 100000;
+      if(open)score+=open*[0,1,9,55,320][length];
+    }
+    return score;
+  }
+  const mine=p.turn+1,other=3-mine;
+  let best=actions[0],value=-Infinity;
+  for(const a of actions){
+    const attack=shape(a,mine),defense=shape(a,other);
+    if(attack>=100000)return a;
+    const score=attack+defense*1.02+(14-Math.abs(a.x-7)-Math.abs(a.y-7))*.08+rng()*.05;
+    if(score>value){value=score;best=a;}
+  }
+  return best;
+}
+function gomokuFixture(w,stones){
+  const m=new w.Match('gomoku',['black','white']);
+  for(const [x,y,color] of stones){m.pub.board[y*15+x]=color||1;m.pub.moves.push([x,y,color||1]);}
+  return m;
+}
+function gomokuPick(w,m,difficulty='normal',rng=()=>.5){
+  return w.ArenaBots.strategies.gomoku({publicState:m.pub,legalActions:w.ArenaBots.adapters.gomoku.view(m).actions,
+    difficulty,random:rng});
+}
+function place(x,y){return {kind:'place',x,y};}
+
+test('Gomoku threat detection builds two open threes and turns a closed four into a four-three win',()=>{
+  const w=world(1,release,{now:()=>0});
+  const fork=gomokuFixture(w,[[6,7],[8,7],[7,6],[7,8],[1,1,2],[13,4,2]]);
+  assert.deepEqual(plain(gomokuPick(w,fork)),place(7,7));
+  const stones=[[4,7],[5,7],[6,7],[3,7,2],[7,5],[7,6],[0,0,2],[13,12,2]];
+  const m=gomokuFixture(w,stones);
+  const move=gomokuPick(w,m);
+  assert.deepEqual(plain(move),place(7,7));
+  m.act('black',move);
+  assert.deepEqual(plain(gomokuPick(w,m)),place(8,7));
+  m.act('white',place(8,7));
+  m.act('black',gomokuPick(w,m));
+  const winEnds=[4,9];
+  assert(winEnds.some(y=>m.pub.board[y*15+7]===0));
+  for(const y of winEnds){
+    const replay=gomokuFixture(w,m.pub.moves);
+    replay.pub.turn=1;
+    replay.act('white',place(7,y));
+    replay.act('black',gomokuPick(w,replay));
+    assert.equal(replay.pub.winner,'black');
+  }
+});
+
+test('Gomoku finds a forcing sequence of two closed fours before an open four',()=>{
+  const w=world(1,release,{now:()=>0});
+  const stones=[[4,7],[5,7],[6,7],[3,7,2],[7,5],[7,6],[7,4,2],[5,8],[6,8],[1,1,2],[4,9,2],[9,4,2]];
+  const m=gomokuFixture(w,stones);
+  for(const [black,white] of [[place(7,7),place(8,7)],[place(7,8),place(7,9)]]){
+    assert.deepEqual(plain(gomokuPick(w,m)),black);
+    m.act('black',black);
+    assert.deepEqual(plain(gomokuPick(w,m)),white);
+    m.act('white',white);
+  }
+  m.act('black',gomokuPick(w,m));
+  const follow=[place(4,8),place(9,8)].find(a=>!m.pub.board[a.y*15+a.x]);
+  assert(follow);
+  m.act('white',follow);
+  m.act('black',gomokuPick(w,m));
+  assert.equal(m.pub.winner,'black');
+});
+
+test('Gomoku exhausted time keeps legal fallback and checks distant mandatory defenses',()=>{
+  let checks=0;
+  const w=world(1,release,{now:()=>checks++?5:0});
+  const edge=gomokuFixture(w,[[10,14,2],[11,14,2],[12,14,2],[13,14,2],[9,14,1]]);
+  assert.deepEqual(plain(gomokuPick(w,edge)),place(14,14));
+  const quiet=gomokuFixture(w,[[7,7],[8,8,2]]);
+  const fallback=gomokuPick(w,quiet);
+  assert(w.ArenaBots.adapters.gomoku.view(quiet).actions.some(a=>a.x===fallback.x&&a.y===fallback.y));
+  assert.notDeepEqual(plain(fallback),place(7,7));
+});
+
+test('Gomoku normal and easy use different choices in a symmetric real position',()=>{
+  const w=world(1,release,{now:()=>0}),m=gomokuFixture(w,[[7,7]]);
+  m.pub.turn=1;
+  assert.notDeepEqual(plain(gomokuPick(w,m,'easy',()=>.999)),plain(gomokuPick(w,m,'normal')));
+});
+
+test('Gomoku RC2 plays RC1 and a simple independent evaluator with matched openings and swapped colors',t=>{
+  const candidate=world(346401,release,{now:()=>0});
+  const historical=world(346401,rc1,{now:()=>0});
+  const policy=candidate.ArenaBots.strategies.gomoku;
+  const opponents={rc1:historical.ArenaBots.strategies.gomoku,classic:classicGomoku};
+  const rows={};
+  for(const [name,opponent] of Object.entries(opponents)){
+    const results={black:{win:0,draw:0,loss:0},white:{win:0,draw:0,loss:0}};
+    let decisions=0;
+    for(let seed=0;seed<12;seed++)for(const color of [0,1]){
+      const m=new candidate.Match('gomoku',['black','white']),rng=random(346500+seed);
+      const offset=seed%8;
+      const openings=[[6,6],[7,6],[8,6],[6,7],[8,7],[6,8],[7,8],[8,8]];
+      m.act('black',place(7,7));m.act('white',place(...openings[offset]));
+      if(seed>=8)m.act('black',place(...openings[(offset+3)%8]));
+      const adapter=candidate.ArenaBots.adapters.gomoku;
+      while(m.pub.phase==='play'){
+        const id=m.pub.players[m.pub.turn];
+        const input=policyInput(adapter.view(m,id),null,{},rng);
+        m.act(id,(m.pub.turn===color?policy:opponent)(input));
+        assert(m.pub.moves.length<=225);
+        decisions++;
+      }
+      const key=color===0?'black':'white';
+      tally(results[key],m.pub.winner===null?'draw':m.pub.winner===key?'win':'loss');
+    }
+    assert(results.black.win+results.white.win>results.black.loss+results.white.loss);
+    rows[name]={...results,decisions};
+  }
+  t.diagnostic(JSON.stringify({rulesSeed:346401,policySeeds:'346500–346511',clock:'fixed; node bound only',rows}));
 });

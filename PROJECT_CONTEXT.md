@@ -42,3 +42,7 @@ PR #3 的发布前体验迭代在 `e16e2ce` 上开发。[RC2 单 HTML](client/Bl
 [候选 HTML](client/Blackmi_OS_V3.4_AI_Arena.html) 提供五款内置游戏的离线与混桌 AI，15 款全部保留真人开局。房主 Bot Manager、座位管理和各游戏适配器在 `sdk/bots/`。旧 HTML、底层通信和三国 RC2 规则冻结。[测试与性能记录](TESTING.md) · [构建指南](sdk/bots/README.md)
 
 真实 PAD 上的单机、真人混合跨设备联机、输入与长时内存仍待验收。
+
+### V3.4 AI Arena RC2
+
+PR #4 的策略复审候选从已审查的 `7c4756462aa872179e5ceace9655d2613434f1a9` 开发。王国补充本席影子规划和跨回合战略记忆，五子棋增加有界威胁搜索。Bot Manager、SDK、通信核心和王国权威结算按 RC1 比对。[候选 HTML](client/Blackmi_OS_V3.4_AI_Arena_RC2.html) · [复测](TESTING.md#v34-ai-arena-rc2)

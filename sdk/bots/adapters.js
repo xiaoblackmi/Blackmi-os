@@ -76,7 +76,9 @@
     if(a.kind==='accept'&&!p.offers.some(o=>o.id===a.offer&&o.to===i&&o.expires>=p.round))return false;
     try{m.plan(i,a,true);return true;}catch(e){return false;}
   }
+  var kingdomPlan=BlackmiArenaPolicies.kingdomPlan;
   api.adapters.kingdoms={
+    observe:BlackmiArenaPolicies.observers.kingdoms,
     turn:function(m,bots,cursor){
       var p=m.pub,n=p.players.length;
       for(var j=0;j<n;j++){
@@ -91,7 +93,7 @@
       var fallback={kind:'ready',round:p.round},actions=[fallback];
       function add(a){
         a.round=p.round;
-        if(kingdomLegal(m,id,a))actions.push(a);
+        if(kingdomLegal(m,id,a)&&kingdomPlan.project(p,i,own.orders,a))actions.push(a);
       }
       if(own.orders.length<4){
         p.tiles.forEach(function(tile,j){
@@ -99,6 +101,7 @@
           var garrison=kSum(tile.army),near=kNeighbors(j);
           var border=near.some(k=>p.tiles[k].owner!==i&&!kAlliance(p,i,p.tiles[k].owner));
           if(border||tile.cap>=0){
+            if(tile.build[2]===0)add({kind:'build',from:j,item:2});
             if(garrison<=27&&r.pop>=2)for(var unit=0;unit<(tile.build[2]>0?3:1);unit++)add({kind:'recruit',from:j,unit:unit});
             if(tile.build[3]<2)add({kind:'build',from:j,item:3});
           }
@@ -108,9 +111,8 @@
             for(var k of near){
               var to=p.tiles[k];
               if(kAlliance(p,i,to.owner))continue;
-              if(to.owner===i&&kSum(to.army)+Math.floor(garrison/2)>30)continue;
               add({kind:'march',from:j,to:k,mode:'half'});
-              if(to.owner!==i||kSum(to.army)+garrison-1<=30)add({kind:'march',from:j,to:k,mode:'full'});
+              add({kind:'march',from:j,to:k,mode:'full'});
             }
           }
         });

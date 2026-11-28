@@ -17,8 +17,9 @@ V3.4 在五子棋、UNO、汉末·逐鹿、德州扑克和王国争霸提供简�
 | `seats.js` | 赛前管理、离线入口、名称和机器人公开元数据 |
 | `manager.js` | 房主注册表、生命周期、唯一待执行动作、投影隔离、故障恢复 |
 | `adapters.js` | 从各引擎获取行动窗口、席位可见信息和合法动作，再做权威复核 |
+| `kingdoms-plan.js` | 按权威结算顺序预测本席已提交指令，筛除确定冲突 |
 | `gomoku.js` 等五个策略文件 | 读取独立数据，给候选打分或做有界搜索，返回一个候选 |
-| `build.cjs` | 静态打包至单文件，从审查过的 RC2 HTML 构建 |
+| `build.cjs` | 静态打包至单文件，从审查过的三国 RC2 HTML 构建 |
 
 策略模块的入口为同步函数 `decide({publicState, privateState, legalActions, difficulty, persona, memory, random})`，返回候选中的一个动作，或 `null` 使用适配器的合法默认动作。规则引擎和内嵌策略分别位于独立词法作用域。输入是复制并递归冻结的 JSON 值。三国策略可从公开战报更新每局有限记忆，CLI 矩阵与客户端复用一个实现。此约定用于受信任的静态内嵌代码。
 
@@ -26,15 +27,17 @@ V3.4 在五子棋、UNO、汉末·逐鹿、德州扑克和王国争霸提供简�
 
 调度复用约 500 ms 的大厅维护，队列刷新、心跳在 AI 之前运行。按大厅 generation、对局 ID、席位和规则窗口定位待执行动作。思考等待与策略计算分离，短窗口按截止时间缩短等待。规则窗口无法匹配、房间退出、结束或错误恢复时清理任务。单次维护最多提交一步，通过 `Lobby.action` 调用原规则和同步。策略报错或返回非法结果时使用合法默认动作，投影或权威执行故障走现有的结束与空快照恢复。
 
-王国争霸对 48 省按本席视野评估，每轮最多提交四条指令后 ready。适配器对候选使用现有 plan 的无写入预检，提交后由原来的同步回合统一结算。五子棋先扫描全部空位的即时胜负，再按局部棋形裁剪根候选和对手回手，普通档限制在 8×6 个搜索节点及时间预算内。
+王国争霸每轮最多提交四条指令后 ready。适配器用原 `plan` 的无写入预检和本席影子状态筛选候选。预测依次处理外交、建设科研征兵、行军，各阶段按已提交顺序。已发贸易邀请保留可能支出的金币，敌军战果仍由权威引擎裁决。跨回合记忆保存当前战略目标、首都、威胁、资源压力、盟友和胜利路线。
+
+五子棋先扫描全部空位的即时获胜与必防。普通档优先识别四三、双活三和连续冲四，搜索最多 52 个试走节点、4 步己方强制落子。4 ms 软截止从策略函数入口开始，覆盖前置扫描和候选评分。到时保留已完成的合法选择，必防扫描始终跑完。
 
 ## 构建与测试
 
 在仓库根目录执行。构建器拒绝覆盖现有文件。
 
 ```sh
-node sdk/bots/build.cjs /tmp/Blackmi_OS_V3.4_AI_Arena.html
-cmp /tmp/Blackmi_OS_V3.4_AI_Arena.html client/Blackmi_OS_V3.4_AI_Arena.html
+node sdk/bots/build.cjs /tmp/Blackmi_OS_V3.4_AI_Arena_RC2.html
+cmp /tmp/Blackmi_OS_V3.4_AI_Arena_RC2.html client/Blackmi_OS_V3.4_AI_Arena_RC2.html
 node --test --test-concurrency=1 tests/*.test.cjs
 ARENA_CHROMIUM=/path/to/chromium80 node sdk/bots/browser-smoke.cjs --virtual-soak
 ```

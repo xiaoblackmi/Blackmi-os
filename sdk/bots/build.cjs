@@ -3,9 +3,10 @@ const path=require('node:path');
 const {Script}=require('node:vm');
 
 const base=path.join(__dirname,'../../client/Blackmi_OS_V3.3_ThreeKingdoms_RC2.html');
-const release=path.join(__dirname,'../../client/Blackmi_OS_V3.4_AI_Arena.html');
+const rc1=path.join(__dirname,'../../client/Blackmi_OS_V3.4_AI_Arena.html');
+const release=path.join(__dirname,'../../client/Blackmi_OS_V3.4_AI_Arena_RC2.html');
 const engine=['manager.js','adapters.js','seats.js'];
-const policies=['gomoku.js','uno.js','three-kingdoms.js','holdem.js','kingdoms.js'];
+const policies=['gomoku.js','uno.js','three-kingdoms.js','holdem.js','kingdoms-plan.js','kingdoms.js'];
 const modules=engine.concat(policies);
 function build(output=release){
   let html=fs.readFileSync(base,'utf8');
@@ -19,7 +20,7 @@ function build(output=release){
   }
 
   replace('name="blackmi-version" content="3.3"','name="blackmi-version" content="3.4"');
-  replace("APP_EDITION='Three Kingdoms RC2'","APP_EDITION='AI Arena'");
+  replace("APP_EDITION='Three Kingdoms RC2'","APP_EDITION='AI Arena RC2'");
   const source=names=>names.map(name=>fs.readFileSync(path.join(__dirname,name),'utf8')).join('\n');
   const policyScope="const BlackmiArenaPolicies=(function(){\n'use strict';\n"+
     "const ArenaBots={strategies:Object.create(null),observers:Object.create(null)};\n"+
@@ -69,4 +70,4 @@ if(require.main===module){
   try{console.log(build(process.argv[2]));}
   catch(error){console.error(error.message);process.exitCode=1;}
 }
-module.exports={build,base,release,modules};
+module.exports={build,base,rc1,release,modules};

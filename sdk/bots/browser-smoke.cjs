@@ -21,7 +21,7 @@ async function check(browser,width,height,url){
   const wait=(fn,...args)=>page.waitForFunction(fn,{},...args);
   try{
     await page.goto(pathToFileURL(release).href);
-    assert.equal(await page.title(),'Blackmi OS · 3.4 AI Arena');
+    assert.equal(await page.title(),'Blackmi OS · 3.4 AI Arena RC2');
     assert.deepEqual(await page.evaluate(()=>[innerWidth,innerHeight,BlackmiSDK.games.list().length]),[width,height,15]);
     await launch('game-center');
     await tap('[data-g="open:gomoku"]');
