@@ -12,13 +12,19 @@
 ## 当前功能与证据
 V1 双人聊天、V2 八台群聊由操作者报告实机通过；V2.7 首批三款游戏操作者报告可用。Core Lab 7 对本机连接 112/112 ACK，总计 288.7ms，中位 RTT 72.1ms（不是 Wi-Fi 延迟）。V3.1.2 有开发机运行与客户端截图证据，尚无该版本 C6 多人联机、长时内存、实机 FPS 验收。
 14 款游戏：五子棋、你画我猜、斗地主、德州扑克、中国象棋、八球台球、传话画画、谁是卧底、UNO、坦克大战、太空足球、躲猫猫、王国争霸、合作生存。用户曾反馈坦克大战流畅；具体版本、人数、帧率未恢复。德州扑克等仅无现金价值娱乐积分。游戏实现范围见 README。
-V3.1.3 Composer Fix 已归档（消息输入布局与版本显示修复）；V3.2 Arcade 和 V3.2.1 Kingdoms Reborn 已合入 main。王国争霸为48省、2–8国、45秒规划、每轮最多4条私有指令、最多20轮的同步战略。大厅协议321；所有参与者统一客户端。分支 README 报告70次地图生成检查、外交/私有指令、14款游戏模拟开局与代表性快照10232字符；未在本次合并重新执行测试，完整浏览器视觉与 C6 真机联机待验。V3.3 三国身份战尚未实现。
+V3.1.3 Composer Fix 已归档（消息输入布局与版本显示修复）；V3.2 Arcade 和 V3.2.1 Kingdoms Reborn 已合入 main。王国争霸为48省、2–8国、45秒规划、每轮最多4条私有指令、最多20轮的同步战略。大厅协议321；所有参与者统一客户端。分支 README 报告70次地图生成检查、外交/私有指令、14款游戏模拟开局与代表性快照10232字符；未在本次合并重新执行测试，完整浏览器视觉与 C6 真机联机待验。
 ## 下次开发
-先读 AGENTS.md、SDK.md、ARCHITECTURE.md、TESTING.md、CHANGELOG.md、docs/ROADMAP.md。确认目标分支/源码；保留旧构建；每次记录变更、文件大小、测试证据、未验收风险。以 V3.2.1 为基线，优先验证输入布局修复与实机稳定性，再做三国身份战原型。旧对话未完整找回，发现新证据及时补充。
+先读 AGENTS.md、SDK.md、ARCHITECTURE.md、TESTING.md、CHANGELOG.md、docs/ROADMAP.md。确认目标分支/源码；保留旧构建；每次记录变更、文件大小、测试证据、未验收风险。正式基线 V3.2.1，V3.3 候选以本页末节为准。旧对话未完整找回，发现新证据及时补充。
 
 ## 2026-11-28 Hardware Lab V2.0 实机基线
 [能力矩阵](docs/PAD_CAPABILITIES.md)、[性能预算](docs/PERFORMANCE_BUDGET.md)、[原始简化 JSON](tests/Blackmi_PAD_Lab_mwzt8gbr.json)。批次 mwzt8gbr，16/16 QR，CRC32 37252d8d；960×600 短时合成负载，2000简单对象59.6FPS，Worker 1MiB Transferable 往返0.3ms，7对本机 RTC 56/56 ACK。实际跨机通信、内存、后台存活、834×360、长时间游戏性能仍待验收。该报告非 V3.2.1 全功能验收。后续开发按软预算和能力矩阵执行。
 
 ## V3.2.2 Developer SDK 候选
 
-基线提交 `266ba0c1810d7bf8f50fbe2baba6637cd585c8b4`。候选 [Blackmi_OS_V3.2.2_DeveloperSDK.html](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 提供 `BlackmiSDK.apps`、`BlackmiSDK.games`、按需绘制和回合制登记。后续 SDK 游戏先写规则和 UI 模块，用 [打包脚本](sdk/bundle.cjs) 生成单 HTML，开发接口见 [SDK.md](SDK.md)。仓库保留 V3.2.1 为正式下载和回滚基线，三国身份战仍是后续任务。
+基线提交 `266ba0c1810d7bf8f50fbe2baba6637cd585c8b4`。候选 [Blackmi_OS_V3.2.2_DeveloperSDK.html](client/Blackmi_OS_V3.2.2_DeveloperSDK.html) 提供 `BlackmiSDK.apps`、`BlackmiSDK.games`、按需绘制和回合制登记。后续 SDK 游戏先写规则和 UI 模块，用 [打包脚本](sdk/bundle.cjs) 生成单 HTML，开发接口见 [SDK.md](SDK.md)。仓库保留 V3.2.1 为正式下载和回滚基线。审查通过的 SDK 稳定性提交为 `2b6ab18bb0c8136cffcba40176539e9169684cdc`。
+
+## V3.3 Three Kingdoms 候选
+
+`feature/3.3-three-kingdoms` 以 `2b6ab18` 为父提交，用 SDK 接入 [汉末·逐鹿](games/three-kingdoms/README.md)。4–8 人可玩，含四身份、12 位武将、108 张牌和军势。新增模块位于 `games/three-kingdoms/`。[候选单 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms.html) 包含 15 款游戏。
+
+49 项自动测试、125 局模拟、14 款旧游戏开局和 Chromium 80 双视口证据见 [TESTING.md](TESTING.md)。PAD 多机、长时性能与真人平衡性待验。

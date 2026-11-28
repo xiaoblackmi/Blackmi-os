@@ -423,3 +423,9 @@ tests/       历史测试数据
 ⭐ 如果项目对你有启发，欢迎 Star 或提交 Issue。
 
 </div>
+
+### V3.3 候选 · 汉末逐鹿
+
+下载 [V3.3 单文件 HTML](client/Blackmi_OS_V3.3_ThreeKingdoms.html)，在游戏中心选择「汉末·逐鹿」，4–8 人入座准备后开局。四种身份、12 名武将、108 张牌。装备和座次影响距离，军势可换取攻击窗口或护垒。[完整规则与技能](games/three-kingdoms/README.md)
+
+此构建通过自动化和 Chromium 80 双视口复测。真实 PAD 多机联机待验收。

@@ -16,7 +16,7 @@
 | V3.2 Arcade | 太空足球、躲猫猫、旧王国争霸、合作生存 | 已归档，14款游戏 |
 | V3.2.1 Kingdoms Reborn | 48省同步战略、外交、战争迷雾；556718 bytes | PR #1 合入 main；分支 README 报告70次地图检查及14款模拟开局通过；实机待验 |
 | V3.2.2 Developer SDK | 统一 App 与回合制注册、按需绘制、类型声明、示例与单 HTML 打包 | 开发候选，测试见 [TESTING.md](TESTING.md) |
-| V3.3 | 三国身份战 | 计划，未在基线实现 |
+| V3.3 Three Kingdoms | 汉末·逐鹿，4–8 人、四身份、12 位武将、108 张牌与军势 | 开发候选。自动化与 Chromium 80 双视口通过，PAD 多机待验 |
 
 2026-11-28 PR #1 合入 V3.1.3、V3.2、V3.2.1 三个历史构建；合并提交 dad7b69。随后同步文档，不修改 HTML。后续每版填写日期、基线提交、产物路径、字节数/哈希、变更与冻结层比对、测试环境/结果、未验收项。产品版本、SDK 版本、协议版本分别管理；V3.1.2 历史握手 lobbyRev=294，V3.2.1 为321；不应盲改握手。
 
@@ -26,3 +26,9 @@
 - 产物 [Blackmi_OS_V3.2.2_DeveloperSDK.html](client/Blackmi_OS_V3.2.2_DeveloperSDK.html)，562,517 字节，比 V3.2.1 增加 5,799 字节。SHA-256 `d28e8b42fb9a03c46997a59a844535503b2e20edfcc598ce6673d4e0ca5ba70b`。
 - 游戏中心按实际定义渲染卡片与数量。候选原版有 14 款游戏，开发示例可选择性打包。SDK 版本 1.0，大厅握手 321。
 - 合并前修复以 `d3d231a` 为基线，增加计时异常隔离、完整快照校验和同步故障恢复。复测构建 565,710 字节，SHA-256 `0c3d5d58c13ab3eb2e3b8b6baf088ad8c2c6f1c207b604de083219406a7a8e07`。原候选可按基线提交取回，V3.2.1 正式下载维持现有版本。
+
+### V3.3 候选 · 2026-11-28
+
+- 基线为 PR #2 已审查的 `2b6ab18bb0c8136cffcba40176539e9169684cdc`，通过独立 SDK 游戏注册集成。历史构建 V3.2.1 和 V3.2.2 保留。
+- [Blackmi_OS_V3.3_ThreeKingdoms.html](client/Blackmi_OS_V3.3_ThreeKingdoms.html) 619,489 字节，模块 53,709 字节。SHA-256 `dc33f6bee8007fb894c4ce3effeed01d3f985acd3da769832d7b84f402cdfa4f`。
+- [规则与构建](games/three-kingdoms/README.md) · [自动化、压力快照和浏览器证据](TESTING.md)
