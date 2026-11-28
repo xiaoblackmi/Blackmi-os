@@ -22,7 +22,7 @@
 
 > Blackmi OS 是面向浏览器及 Android WebView 的单文件 Web 桌面应用平台，而不是 Android ROM。它无需安装额外的前端依赖或专用后端，在支持 WebRTC 且设备彼此可达的获授权网络中即可尝试使用。
 >
-> 当前分支 V3.2.1 Kingdoms Reborn 为开发候选版，优先适配 834×360 超宽屏 WebView。上图为 V3.1.2 历史客户端截图，并非新版实机验收。游戏大厅协议 321，参与者必须统一版本。
+> 当前 main 分支 V3.2.1 Kingdoms Reborn 为开发候选版，优先适配 834×360 超宽屏 WebView。上图为 V3.1.2 历史客户端截图，并非新版实机验收。游戏大厅协议 321，参与者必须统一版本。
 
 ---
 
@@ -310,7 +310,7 @@ flowchart TD
 
 | 项目 | 当前信息 |
 | :--- | :--- |
-| 最新构建 | V3.2.1 Kingdoms Reborn（开发分支） |
+| 最新构建 | V3.2.1 Kingdoms Reborn（main 开发候选版） |
 | 日期 | 2026-11-28 |
 | 文件大小 | 556,718 bytes（约 544 KiB） |
 | 技术栈 | HTML / CSS / JavaScript / Canvas / WebRTC |
