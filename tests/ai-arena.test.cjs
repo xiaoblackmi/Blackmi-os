@@ -235,6 +235,75 @@ test('200 seeded Three Kingdoms policy games finish with intact card zones',t=>{
   t.diagnostic(JSON.stringify({seeds:[3402,'43000–43199'],threeKingdoms:summary(results)}));
 });
 
+test('Holdem minimum raises, short all-ins, and human ownership of seat one',()=>{
+  const w=world(),m=new w.Holdem(['a','b','c']),adapter=w.ArenaBots.adapters.holdem,p=m.pub;
+  const i=p.turn,id=p.players[i];
+  p.high=50;p.minRaise=30;p.bets[i]=20;p.stacks[i]=55;
+  assert.deepEqual(plain(adapter.view(m,id).actions.filter(a=>a.kind==='raise')),[{kind:'raise',to:75}]);
+  p.acted[i]=true;
+  assert(!adapter.view(m,id).actions.some(a=>a.kind==='raise'));
+  p.acted[i]=false;p.stacks[i]=200;
+  assert(adapter.view(m,id).actions.every(a=>a.kind!=='raise'||a.to>=80));
+  const view=plain(adapter.view(m,id));
+  const other=p.players[(i+1)%p.players.length];
+  [m.secret.hands[other][0],m.secret.deck[0]]=[m.secret.deck[0],m.secret.hands[other][0]];
+  const after=plain(adapter.view(m,id));
+  assert.deepEqual(view,after);
+  const choose=v=>plain(w.ArenaBots.strategies.holdem({publicState:v.public,privateState:v.private,
+    legalActions:v.actions,difficulty:'normal',persona:'bold',memory:{},random:random(8)}));
+  assert.deepEqual(choose(view),choose(after));
+  const l=new w.Lobby();l.create('Host');l.prepare('holdem');seat(l,l.me,1);
+  l.configureBot(0,'add');
+  assert.throws(()=>l.start('holdem'),/1 号席/);
+  const bot=l.setup.seats[0];
+  l.assign(bot,1,l.me);
+  l.setReady(l.me,true,0);
+  l.start('holdem');
+  assert.equal(l.match.pub.players[0],l.me);
+});
+
+test('Holdem runs 500 seeded hands, multi-hand review and short-stack side pots without minting points',t=>{
+  const w=world(3403),results=[];
+  let completed=0,multiHandTables=0;
+  for(let table=0;completed<500;table++){
+    const count=2+table%7, ids=Array.from({length:count},(_,i)=>'p'+i);
+    const m=new w.Holdem(ids),rng=random(44000+table);
+    // Equal total with uneven stacks forces at least one short all-in before a round starts.
+    if(table%3===0){
+      m.pub.phase='review';
+      m.pub.stacks=ids.map((_,i)=>i===0?25:i===1?1975:1000);
+      m.act(ids[0],{kind:'next-hand'});
+    }
+    let hands=0;
+    for(;hands<12&&completed<500;hands++){
+      results.push(sim(w,'holdem',m,{limit:400,rng,invariant:m=>{
+        const sum=m.pub.stacks.concat(m.pub.paid).reduce((a,b)=>a+b,0);
+        assert.equal(sum,count*1000);
+        assert(m.pub.stacks.every(x=>Number.isInteger(x)&&x>=0));
+      }}));
+      assert.equal(m.pub.phase,'review');
+      assert.equal(m.pub.stacks.reduce((a,b)=>a+b,0),count*1000);
+      assert(m.pub.results.length>0);
+      completed++;
+      assert.throws(()=>m.act(ids[1],{kind:'next-hand'}),/桌主/);
+      if(m.pub.stacks.filter(x=>x>0).length<2)break;
+      m.act(ids[0],{kind:'next-hand'});
+    }
+    if(hands>=2)multiHandTables++;
+  }
+  assert(multiHandTables>30);
+  const side=new w.Holdem(['x','y','z']);
+  side.pub.phase='review';side.pub.stacks=[25,75,2900];side.act('x',{kind:'next-hand'});
+  for(let i=0;i<20&&side.pub.phase==='play';i++){
+    const p=side.pub,id=p.players[p.turn],legal=w.ArenaBots.adapters.holdem.view(side,id).actions;
+    side.act(id,legal.filter(a=>a.kind==='raise').at(-1)||{kind:'call'});
+  }
+  assert.equal(side.pub.phase,'review');
+  assert.equal(side.pub.community.length,5);
+  assert.equal(side.pub.stacks.reduce((a,b)=>a+b,0),3000);
+  t.diagnostic(JSON.stringify({seeds:[3403,44000],hands:completed,multiHandTables,holdem:summary(results)}));
+});
+
 test('candidate is deterministic and transport, pairing, chat and AIGC remain exact',t=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arena-'));
   t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));

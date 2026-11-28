@@ -41,5 +41,30 @@
       return {public:p,private:privateState,actions:actions,fallback:actions.find(a=>['pass','end-turn','auto-discard'].includes(a.kind))};
     }
   };
+  function holdemActions(p){
+    var i=p.turn,actions=[{kind:'fold'},{kind:'call'}];
+    var max=p.bets[i]+p.stacks[i],min=p.high+p.minRaise;
+    if(!p.acted[i]&&max>p.high){
+      var half=p.high+Math.max(p.minRaise,Math.floor(p.paid.reduce((a,b)=>a+b,0)/2));
+      for(var to of new Set([Math.min(max,min),Math.min(max,half),Math.min(max,2*half-p.high)])){
+        actions.push({kind:'raise',to:to});
+      }
+    }
+    return actions;
+  }
+  api.adapters.holdem={
+    turn:function(m,bots){
+      var p=m.pub;
+      return p.phase==='play'&&p.turn>=0&&m.eligible(p.turn)?
+        turn(m,bots,[p.handNo,p.street,p.turn,p.high,p.paid.join(',')].join(':')):null;
+    },
+    view:function(m,id){
+      var p=m.pub,privateState=m.privateFor(id),actions=holdemActions(p);
+      if(p.community.length)privateState.rank=bestRank(privateState.hand.concat(p.community));
+      if(p.community.length===5)privateState.boardRank=fiveRank(p.community);
+      return {public:{turn:p.turn,street:p.street,community:p.community,stacks:p.stacks,bets:p.bets,paid:p.paid,
+        high:p.high,folded:p.folded},private:privateState,actions:actions,fallback:p.high===p.bets[p.turn]?actions[1]:actions[0]};
+    }
+  };
   api.turn=turn;
 })(ArenaBots);
