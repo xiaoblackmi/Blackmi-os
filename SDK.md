@@ -74,3 +74,9 @@ Lobby 逐接收者构建并校验整批快照，完成校验后才派发。单�
 - 默认 Canvas 2D 主线程绘制。非持续动画使用 `onRender` 或直接更新变动节点。有二次计算重负载再测可选 Worker，关闭时释放。
 - 普通游戏快照以约 16 KiB 为软目标。避免每帧刷新 DOM。应用状态留在会话，保留文件选择和手动交互回退。
 - 宿主剪贴板和媒体权限在最新实测被拒绝，文件导出未成功，`OffscreenCanvas` 不可用。当前实测 RTC 仅验证了单台回环。详见 [PAD 能力](docs/PAD_CAPABILITIES.md)、[性能预算](docs/PERFORMANCE_BUDGET.md) 和 [验收记录](TESTING.md)。
+
+## V3.4 内嵌离线人机
+
+AI Arena 候选在大厅应用层增加虚拟座位和共用调度。现有 `BlackmiSDK.games.register` 与类型定义沿用原契约。人机接入使用 `sdk/bots/` 下的内嵌适配器与同步策略。已有游戏可先提供行动窗口、接收方合法候选和自己的私有视图，再加入策略文件。客户端仍使用同版单 HTML。
+
+`setup.bots` 和快照 `state.bots` 是可选的显示元数据数组。规则用 `players` 获取已参赛的 ID，UI 可以继续通过 `game.playerName(id)` 显示名称。等待准备、开局、断线、错误及快照限制由大厅负责。[人机开发指南](sdk/bots/README.md)

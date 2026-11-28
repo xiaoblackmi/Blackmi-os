@@ -3,7 +3,9 @@ const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
 const {pathToFileURL}=require('node:url');
-const {release}=require('../build.cjs');
+const {release:rc2}=require('../build.cjs');
+const release=process.env.THREE_KINGDOMS_TEST_CLIENT||rc2;
+const expectedTitle=process.env.THREE_KINGDOMS_TEST_TITLE||'Blackmi OS · 3.3 Three Kingdoms RC2';
 
 const puppeteer=require(process.env.THREE_KINGDOMS_PUPPETEER || 'puppeteer-core');
 const chromium=process.env.THREE_KINGDOMS_CHROMIUM;
@@ -163,7 +165,7 @@ async function check(page,width,height,fixtureUrl) {
   try {
     await page.setViewport({width,height,deviceScaleFactor:2,hasTouch:true,isLandscape:true});
     await page.goto(pathToFileURL(release).href);
-    assert.equal(await page.title(),'Blackmi OS · 3.3 Three Kingdoms RC2');
+    assert.equal(await page.title(),expectedTitle);
     assert.deepEqual(await page.evaluate(()=>[innerWidth,innerHeight,devicePixelRatio,BlackmiSDK.games.list().length]),[width,height,2,15]);
     await page.evaluate(()=>BlackmiSDK.apps.launch('game-center'));
     await page.tap('[data-g="open:three-kingdoms"]');
